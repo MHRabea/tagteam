@@ -46,6 +46,7 @@ if (!root) throw new Error('Run the smoke test inside a git repository.');
 let failures = 0;
 // $ per million tokens [input, output], for the cost line only. Anthropic: claude-haiku-5-5 list price (2026-11).
 const PRICE = { anthropic: [0.1, 0.5] };
+const TRANSIENT = /HTTP (429|5\d\d)\b|fetch failed|aborted|timeout/i;
 const transcript = [
   { role: 'user', text: 'Read TASK.md and do step 1 only: fix prorate in src/billing.js.' },
   { role: 'assistant', text: 'prorate() computes diff * daysInPeriod / daysLeft; it should be diff * daysLeft / daysInPeriod. I will fix it and run npm test.' },
@@ -68,14 +69,22 @@ for (const [name, p] of Object.entries(PROVIDERS)) {
       if (!p.model) throw new Error('no model; pass provider=model');
       const t = Date.now();
       let usage = { input: 0, output: 0 };
-      const h = await summarize({ api: p, key, root, transcript, onUsage: (u) => (usage = u) });
+      const once = () => summarize({ api: p, key, root, transcript, onUsage: (u) => (usage = u) });
+      const h = await once().catch(async (e) => {
+        if (!TRANSIENT.test(e.message)) throw e;
+        await new Promise((r) => setTimeout(r, 10_000)); // one retry for an overloaded provider
+        return once();
+      });
       const price = PRICE[name];
       const cost = price ? ` ≈ $${((usage.input * price[0] + usage.output * price[1]) / 1e6).toFixed(5)}` : '';
       console.log(`✓ ${name.padEnd(9)} ${p.model} ${((Date.now() - t) / 1000).toFixed(1)}s, ${usage.input} in / ${usage.output} out tokens${cost} → next_action: ${h.next_action}`);
     }
   } catch (e) {
-    failures++;
-    console.log(`✗ ${name.padEnd(9)} ${redact(e.message).slice(0, 300)}`);
+    // Overload and network errors are the provider's problem, not tagteam's: warn, don't fail.
+    // Auth errors, unknown models and bad replies still fail the run.
+    const transient = TRANSIENT.test(e.message);
+    if (!transient) failures++;
+    console.log(`${transient ? '!' : '✗'} ${name.padEnd(9)} ${transient ? 'unavailable right now: ' : ''}${redact(e.message).replace(/\s+/g, ' ').slice(0, 300)}`);
   }
 }
 process.exitCode = failures ? 1 : 0;

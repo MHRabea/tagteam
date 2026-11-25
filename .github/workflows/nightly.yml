@@ -1,0 +1,59 @@
+# Nightly: catch breaking changes in the agents and providers before users do.
+# 1. Install the latest Claude Code and Codex and check every flag tagteam passes still exists.
+# 2. Run the full suite with those agents on PATH.
+# 3. If provider keys are set as repository secrets, run the live summarizer smoke test.
+#    Keys are written to a temp file that never leaves the runner; the script never prints them.
+name: nightly
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  agents:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm i -g @anthropic-ai/claude-code@latest @openai/codex@latest
+      - name: Agent flag contract
+        run: node scripts/contract.mjs --require claude,codex
+      - run: npm test
+
+  providers:
+    runs-on: ubuntu-latest
+    if: ${{ github.repository_owner == 'MHRabea' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Live summarizer smoke (only providers with a secret set)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+        shell: bash
+        run: |
+          f="$RUNNER_TEMP/providers.env"
+          for k in ANTHROPIC_API_KEY OPENAI_API_KEY DEEPSEEK_API_KEY GEMINI_API_KEY XAI_API_KEY; do
+            [ -n "${!k}" ] && echo "$k=${!k}" >> "$f"
+          done
+          if [ ! -s "$f" ]; then echo "No provider secrets set; skipping."; exit 0; fi
+          node scripts/smoke.mjs "$f" summarize
+          rm -f "$f"

@@ -1,0 +1,49 @@
+{
+  "name": "tagteam-ai",
+  "version": "0.1.0",
+  "description": "Switch AI coding agents mid-task without losing context: git-verified, agent-agnostic handoffs",
+  "author": {
+    "name": "Mahmoud Rabea",
+    "url": "https://mahmoudrabea96.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MHRabea/tagteam.git"
+  },
+  "homepage": "https://github.com/MHRabea/tagteam#readme",
+  "bugs": {
+    "url": "https://github.com/MHRabea/tagteam/issues"
+  },
+  "type": "module",
+  "bin": {
+    "tagteam": "src/cli.js"
+  },
+  "files": [
+    "src",
+    "templates",
+    "NOTICE"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "contract": "node scripts/contract.mjs",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.6.7"
+  },
+  "keywords": [
+    "claude-code",
+    "codex",
+    "ai-agents",
+    "mcp",
+    "handoff",
+    "context",
+    "deepseek",
+    "cli"
+  ]
+}

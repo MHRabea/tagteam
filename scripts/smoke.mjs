@@ -44,6 +44,8 @@ async function listModels(p, key) {
 const root = gitRoot(process.cwd()); // any git repo works: the summarizer reads its git state
 if (!root) throw new Error('Run the smoke test inside a git repository.');
 let failures = 0;
+// $ per million tokens [input, output], for the cost line only. Anthropic: claude-haiku-5-5 list price (2026-11).
+const PRICE = { anthropic: [0.1, 0.5] };
 const transcript = [
   { role: 'user', text: 'Read TASK.md and do step 1 only: fix prorate in src/billing.js.' },
   { role: 'assistant', text: 'prorate() computes diff * daysInPeriod / daysLeft; it should be diff * daysLeft / daysInPeriod. I will fix it and run npm test.' },
@@ -65,8 +67,11 @@ for (const [name, p] of Object.entries(PROVIDERS)) {
     } else {
       if (!p.model) throw new Error('no model; pass provider=model');
       const t = Date.now();
-      const h = await summarize({ api: p, key, root, transcript });
-      console.log(`✓ ${name.padEnd(9)} ${p.model} ${((Date.now() - t) / 1000).toFixed(1)}s → next_action: ${h.next_action}`);
+      let usage = { input: 0, output: 0 };
+      const h = await summarize({ api: p, key, root, transcript, onUsage: (u) => (usage = u) });
+      const price = PRICE[name];
+      const cost = price ? ` ≈ $${((usage.input * price[0] + usage.output * price[1]) / 1e6).toFixed(5)}` : '';
+      console.log(`✓ ${name.padEnd(9)} ${p.model} ${((Date.now() - t) / 1000).toFixed(1)}s, ${usage.input} in / ${usage.output} out tokens${cost} → next_action: ${h.next_action}`);
     }
   } catch (e) {
     failures++;

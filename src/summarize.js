@@ -38,7 +38,7 @@ export function extractJson(text) {
   return JSON.parse(s.slice(i, j + 1));
 }
 
-async function callModel(api, key, user) {
+async function callModel(api, key, user, onUsage) {
   const base = api.baseUrl.replace(/\/$/, '');
   const anthropic = api.format === 'anthropic';
   const res = await fetch(anthropic ? `${base}/v1/messages` : `${base}/chat/completions`, {
@@ -56,6 +56,9 @@ async function callModel(api, key, user) {
   const body = await res.text();
   if (!res.ok) throw new Error(`Summarizer HTTP ${res.status}: ${redact(body).slice(0, 300)}`);
   const json = JSON.parse(body);
+  // Token counts for cost tracking: Anthropic input_tokens/output_tokens, OpenAI-style prompt_tokens/completion_tokens.
+  const u = json.usage ?? {};
+  onUsage?.({ input: u.input_tokens ?? u.prompt_tokens ?? 0, output: u.output_tokens ?? u.completion_tokens ?? 0 });
   return anthropic ? json.content?.find((c) => c.type === 'text')?.text ?? '' : json.choices?.[0]?.message?.content ?? '';
 }
 
@@ -69,6 +72,6 @@ export function normalise(raw) {
   return HandoffInput.parse(r);
 }
 
-export async function summarize({ api, key, root, transcript = [], prev }) {
-  return normalise(extractJson(await callModel(api, key, buildPrompt({ root, transcript, prev }))));
+export async function summarize({ api, key, root, transcript = [], prev, onUsage }) {
+  return normalise(extractJson(await callModel(api, key, buildPrompt({ root, transcript, prev }), onUsage)));
 }

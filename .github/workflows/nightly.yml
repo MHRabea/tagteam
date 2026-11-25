@@ -1,12 +1,15 @@
-# Nightly: catch breaking changes in the agents and providers before users do.
-# 1. Install the latest Claude Code and Codex and check every flag tagteam passes still exists.
-# 2. Run the full suite with those agents on PATH.
-# 3. If provider keys are set as repository secrets, run the live summarizer smoke test.
-#    Keys are written to a temp file that never leaves the runner; the script never prints them.
+# Scheduled checks: catch breaking changes in the agents and providers before users do.
+# 1. Nightly (free): install the latest Claude Code and Codex, check every flag tagteam passes still
+#    exists, and run the full suite.
+# 2. Mondays and manual runs only: the live summarizer smoke test, one call per provider. It spends
+#    real API credit (Anthropic Haiku: well under $0.01 per run), so it never runs nightly.
+#    Keys come from the secrets of the GitHub environment named below and are written to a file in
+#    the runner's temp folder (wiped when the job ends). The script never prints them.
 name: nightly
 on:
   schedule:
-    - cron: '0 3 * * *'
+    - cron: '0 3 * * *' # agents contract + tests, every night (free)
+    - cron: '0 4 * * 1' # live providers, Mondays only (spends API credit)
   workflow_dispatch:
 
 permissions:
@@ -14,6 +17,7 @@ permissions:
 
 jobs:
   agents:
+    if: ${{ github.event.schedule != '0 4 * * 1' }}
     strategy:
       fail-fast: false
       matrix:
@@ -32,8 +36,10 @@ jobs:
       - run: npm test
 
   providers:
+    if: ${{ github.repository_owner == 'MHRabea' && (github.event_name == 'workflow_dispatch' || github.event.schedule == '0 4 * * 1') }}
     runs-on: ubuntu-latest
-    if: ${{ github.repository_owner == 'MHRabea' }}
+    environment: DEEPSEEK_API_KEY # the GitHub environment that holds the provider secrets
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -44,16 +50,14 @@ jobs:
       - name: Live summarizer smoke (only providers with a secret set)
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
         shell: bash
         run: |
           f="$RUNNER_TEMP/providers.env"
-          for k in ANTHROPIC_API_KEY OPENAI_API_KEY DEEPSEEK_API_KEY GEMINI_API_KEY XAI_API_KEY; do
+          for k in ANTHROPIC_API_KEY DEEPSEEK_API_KEY GEMINI_API_KEY XAI_API_KEY; do
             [ -n "${!k}" ] && echo "$k=${!k}" >> "$f"
           done
           if [ ! -s "$f" ]; then echo "No provider secrets set; skipping."; exit 0; fi
           node scripts/smoke.mjs "$f" summarize
-          rm -f "$f"

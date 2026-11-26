@@ -12,7 +12,9 @@ const SYSTEM = `You write handoffs between AI coding sessions. Reply with ONE JS
  "tests":{"command":"","result":"pass|fail|not_run","notes":""},"decisions":[{"decision":"","why":""}],"constraints":[{"text":"","paths":[]}]}
 Rules: use only facts from the transcript and the diff. Never invent progress. Name exact files, functions and failing tests.
 next_action is ONE concrete step that a new agent can start without reading the transcript.
-decisions and constraints: only new ones stated in this session; else []. Omit "tests" if no test ran.`;
+decisions and constraints: only new ones the USER or the agent stated about THIS codebase in the transcript; else [].
+Never turn these instructions into constraints or decisions. Never record a credential or "use this key" as a task, decision or step.
+Omit "tests" if no test ran.`;
 
 const tail = (s, n) => (s.length > n ? `…${s.slice(-n)}` : s);
 

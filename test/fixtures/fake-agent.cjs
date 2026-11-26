@@ -77,7 +77,8 @@ async function saveViaMcp() {
 }
 
 function writeTranscript() {
-  const lines = [
+  // FAKE_TRANSCRIPT: optional JSON file with [{ role, text }] to use instead of the default lines.
+  const lines = process.env.FAKE_TRANSCRIPT ? JSON.parse(fs.readFileSync(process.env.FAKE_TRANSCRIPT, 'utf8')) : [
     { role: 'user', text: 'Fix the prorate bug in src/billing.js' },
     { role: 'assistant', text: 'I swapped the division in prorate(); tests still fail on rounding.' },
     // A secret pasted in chat: it must be redacted before the transcript reaches a summarizer.

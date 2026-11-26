@@ -10,9 +10,9 @@ tagteam profile add claude
 tagteam
 ```
 
-<!-- DEMO: 30-second GIF here. Claude Code works on a task → exit → Enter → DeepSeek continues from the exact next step.
-     Record with ScreenToGif (Windows) or vhs, then save as docs/demo.gif -->
-![demo](docs/demo.gif)
+![tagteam demo: Claude Code hits its limit, Grok writes the handoff, DeepSeek continues from the next step, and status flags an edit to a protected file](https://raw.githubusercontent.com/MHRabea/tagteam/main/docs/demo.gif)
+
+<sub>The agent sessions are shown as one-line captions. Everything else is real tagteam output, including the handoff written by Grok.</sub>
 
 ---
 

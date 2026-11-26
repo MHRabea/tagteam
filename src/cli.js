@@ -100,7 +100,7 @@ async function main() {
         const cfg = readConfig();
         if (!Object.keys(cfg.profiles).length) return console.log('No profiles. Try: tagteam profile add claude');
         for (const [n, p] of Object.entries(cfg.profiles)) {
-          const where = p.provider?.base_url || p.env?.ANTHROPIC_BASE_URL || p.command || 'native login';
+          const where = p.provider?.base_url || p.env?.ANTHROPIC_BASE_URL || p.command || (p.agent === 'none' ? `${p.api?.baseUrl} (summarizer only)` : 'native login');
           const key = needsKey(p) ? (p.key ? 'key stored' : 'NO KEY') : 'no key needed';
           console.log(`${n.padEnd(14)} ${p.agent.padEnd(7)} ${(p.model ?? '-').padEnd(18)} ${where}  [${key}]`);
         }

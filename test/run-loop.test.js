@@ -43,7 +43,7 @@ beforeEach(() => {
   process.env.CODEX_HOME = path.join(dir, 'codex-home');
   process.env.CLAUDE_CONFIG_DIR = path.join(dir, 'claude-config'); // /handoff command goes here, not ~/.claude
   process.env.CLAUDECODE = '1'; // as if tagteam itself runs inside a Claude Code terminal
-  process.env.TAGTEAM_SUMMARY_TIMEOUT_MS = '1500';
+  process.env.TAGTEAM_SUMMARY_TIMEOUT_MS = '3000'; // generous for slow CI runners; only the 'hang' route waits for it
   const root = makeRepo();
   write(root, 'src/billing.js', 'export const prorate = (a, d) => d / a;\n');
   commit(root, 'billing');

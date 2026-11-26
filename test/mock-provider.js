@@ -14,14 +14,15 @@ export function mockProvider(routes) {
   const seen = [];
   const counts = {};
   const server = http.createServer((req, res) => {
-    let body = '';
-    req.on('data', (c) => (body += c));
+    // Recorded on arrival, not when the body ends: a client that times out mid-upload (slow CI) still counts as tried.
+    const entry = { prefix: '/' + req.url.split('/')[1], url: req.url, headers: req.headers, body: '' };
+    seen.push(entry);
+    req.on('data', (c) => (entry.body += c));
     req.on('end', () => {
-      const prefix = '/' + req.url.split('/')[1];
+      const { prefix } = entry;
       const list = routes[prefix] ?? ['ok'];
       const n = (counts[prefix] = (counts[prefix] ?? 0) + 1);
       const how = list[n - 1] ?? list.at(-1);
-      seen.push({ prefix, url: req.url, headers: req.headers, body });
       if (how === 'hang') return; // never answers: the client must time out
       res.setHeader('content-type', 'application/json');
       if (how === 'garbage') return res.end('{"choices": [ not json');

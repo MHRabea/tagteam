@@ -1,9 +1,12 @@
 # Changelog
 
-## 0.1.2 (2026-11-26)
+## 0.1.3 (2026-11-26)
 
-Same changes as 0.1.1, which was tagged but never reached npm (the release workflow's npm was too
-old for trusted publishing).
+The changes listed under 0.1.1. First release published from GitHub Actions through npm trusted
+publishing, with provenance. 0.1.1 and 0.1.2 were tagged but never reached npm (the release workflow's
+npm was too old, then the trusted publisher was not yet set up).
+
+## 0.1.2 (not published)
 
 ## 0.1.1 (not published)
 

@@ -1,0 +1,17 @@
+name: Support an agent or provider
+description: Ask for (or report results with) an agent CLI or model provider
+labels: [provider]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: Agent or provider
+      placeholder: e.g. Gemini CLI, OpenRouter, Qwen, a local model
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: How do you run it today, and what happened with tagteam?
+    validations:
+      required: true

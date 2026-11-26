@@ -1,0 +1,32 @@
+name: Bug report
+description: Something in tagteam does not work as described
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Please never paste API keys or tokens. `tagteam doctor` output is safe to share; it never prints keys.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. tagteam profile add ...\n2. tagteam\n3. ..."
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `tagteam doctor`
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: Windows 11 / macOS 15 / Ubuntu 24.04

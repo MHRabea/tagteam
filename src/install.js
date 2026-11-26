@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { readJson, writeJson, writeFile } from './store.js';
 
 const TEMPLATE = fileURLToPath(new URL('../templates/handoff.md', import.meta.url));
+const SKILL = fileURLToPath(new URL('../templates/skill/SKILL.md', import.meta.url));
 // Also matches hooks from the pre-rename name (acm) so re-installing replaces them.
 const isOurs = (command) => /^(tagteam|acm)\s/.test(command ?? '');
 
@@ -45,11 +46,14 @@ export function installClaude(root) {
 
   const cmdFile = path.join(root, '.claude', 'commands', 'handoff.md');
   writeFile(cmdFile, fs.readFileSync(TEMPLATE, 'utf8'));
+  const skillFile = path.join(root, '.claude', 'skills', 'tagteam', 'SKILL.md');
+  writeFile(skillFile, fs.readFileSync(SKILL, 'utf8'));
 
   return [
     `Hooks:   ${settingsFile}`,
     `MCP:     ${mcpFile}`,
     `Command: ${cmdFile}  (/handoff)`,
+    `Skill:   ${skillFile}  (tagteam)`,
     'Restart Claude Code in this repo.',
   ];
 }

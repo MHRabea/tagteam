@@ -117,7 +117,7 @@ tagteam profile add other  --agent custom --command "my-agent --prompt-file {con
 | `tagteam install claude\|codex\|cursor` | Permanent per-repo wiring, if you run agents without `tagteam` |
 | `tagteam mcp` | MCP server: `get_context`, `save_handoff`, `add_decision`, `add_constraint`, `update_memory`, `list_handoffs` |
 
-In Claude Code, `/handoff` saves a handoff written by the agent itself.
+In Claude Code, `/handoff` saves a handoff written by the agent itself, and the `tagteam` skill tells the agent when to use tagteam on its own: check drift at session start, record rules and decisions as they come up, save a handoff before it stops, and run `tagteam status` before committing. `tagteam run` installs both at user level (`~/.claude/commands/handoff.md`, `~/.claude/skills/tagteam/SKILL.md`) and never overwrites files of your own with the same name. The skill is plain [templates/skill/SKILL.md](templates/skill/SKILL.md), so any agent that reads Agent Skills can use it.
 
 ## Security and privacy
 

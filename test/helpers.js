@@ -7,6 +7,8 @@ export const tmp = (prefix) => fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 
 // Isolated TAGTEAM_HOME per test file so tests never touch ~/.tagteam.
 process.env.TAGTEAM_HOME = tmp('tagteam-home-');
+// The /handoff command and the skill are installed under the Claude config dir: never the real ~/.claude in tests.
+process.env.CLAUDE_CONFIG_DIR = tmp('tagteam-claude-');
 // CI runners on macOS/Linux have no unlocked keyring; tests that need one stub it (see production.test.js).
 if (process.platform !== 'win32') process.env.TAGTEAM_KEY_STORE ??= 'plain';
 

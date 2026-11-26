@@ -16,6 +16,7 @@ import { summarize } from './summarize.js';
 
 const CLI = fileURLToPath(new URL('./cli.js', import.meta.url));
 const TEMPLATE = fileURLToPath(new URL('../templates/handoff.md', import.meta.url));
+export const SKILL = fileURLToPath(new URL('../templates/skill/SKILL.md', import.meta.url));
 const toml = (s) => JSON.stringify(s); // a JSON string is a valid TOML basic string
 
 const CLAUDE_START = 'Continue the task from the tagteam session context. Check any drift warnings against the code first. Run /handoff before you stop.';
@@ -76,12 +77,19 @@ export function claudeRuntime(root) {
   const mcp = path.join(dir, `claude-mcp-${projectId(root)}.json`);
   writeJson(mcp, { mcpServers: { tagteam: { command: process.execPath, args: [CLI, 'mcp'], env: teamEnv(root) } } });
 
-  // /handoff as a user-level command, so it works in every repo. Never overwrite a user's own file.
-  const cmdFile = path.join(process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude'), 'commands', 'handoff.md');
-  const ours = fs.readFileSync(TEMPLATE, 'utf8');
-  const existing = fs.existsSync(cmdFile) ? fs.readFileSync(cmdFile, 'utf8') : null;
-  if (existing === null || (existing !== ours && existing.includes('tagteam capture --json'))) writeFile(cmdFile, ours);
+  // The /handoff command and the tagteam skill live at user level, so they work in every repo
+  // and nothing is written into the user's repo.
+  const config = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
+  installUserFile(path.join(config, 'commands', 'handoff.md'), TEMPLATE, 'tagteam capture --json');
+  installUserFile(path.join(config, 'skills', 'tagteam', 'SKILL.md'), SKILL, 'name: tagteam');
   return { settings, mcp };
+}
+
+// Write our template unless the user has their own file there: replace only a file that carries our marker.
+export function installUserFile(file, template, marker) {
+  const ours = fs.readFileSync(template, 'utf8');
+  const existing = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
+  if (existing === null || (existing !== ours && existing.includes(marker))) writeFile(file, ours);
 }
 
 // Drop variables inherited from a parent agent session (tagteam run inside a Claude Code terminal):

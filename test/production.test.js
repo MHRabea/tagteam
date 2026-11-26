@@ -177,3 +177,32 @@ test('doctor reports a missing agent and an unreadable key as problems, never th
   removeProfile('doc-claude');
   removeProfile('doc-ds');
 });
+
+test('the tagteam skill is installed at user level, and a user-owned SKILL.md is never overwritten', async () => {
+  const { claudeRuntime, SKILL } = await import('../src/launcher.js');
+  const root = makeRepo();
+  store.ensureProject(root);
+  const skillFile = path.join(process.env.CLAUDE_CONFIG_DIR, 'skills', 'tagteam', 'SKILL.md');
+  const ours = fs.readFileSync(SKILL, 'utf8');
+
+  claudeRuntime(root);
+  assert.equal(fs.readFileSync(skillFile, 'utf8'), ours);
+  assert.match(ours, /^---\nname: tagteam\ndescription: .+\n---\n/);
+  for (const tool of ['get_context', 'save_handoff', 'add_constraint', 'add_decision', 'update_memory']) assert.match(ours, new RegExp(tool));
+
+  fs.writeFileSync(skillFile, '---\nname: tagteam\ndescription: old version\n---\n');
+  claudeRuntime(root);
+  assert.equal(fs.readFileSync(skillFile, 'utf8'), ours, 'an older tagteam skill is updated');
+
+  fs.writeFileSync(skillFile, '---\nname: my-own\n---\nmine');
+  claudeRuntime(root);
+  assert.equal(fs.readFileSync(skillFile, 'utf8'), '---\nname: my-own\n---\nmine', "the user's own file is kept");
+});
+
+test('install claude writes the skill into the repo when asked to', async () => {
+  const { installClaude } = await import('../src/install.js');
+  const root = makeRepo();
+  const lines = installClaude(root);
+  assert.ok(fs.existsSync(path.join(root, '.claude', 'skills', 'tagteam', 'SKILL.md')));
+  assert.ok(lines.some((l) => l.startsWith('Skill:')));
+});

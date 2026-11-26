@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- New `tagteam` Agent Skill: tells Claude Code when to read the context, record constraints and decisions,
+  save a handoff, and run `tagteam status` before committing. `tagteam run` installs it at
+  `~/.claude/skills/tagteam/SKILL.md`; `tagteam install claude` puts it in the repo's `.claude/skills/`.
+- Tests never write to the real `~/.claude`.
+
 ## 0.1.4 (2026-11-26)
 
 - Ready for the official MCP Registry: `server.json` and `mcpName` (`io.github.MHRabea/tagteam`).

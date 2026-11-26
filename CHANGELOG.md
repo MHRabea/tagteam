@@ -1,6 +1,11 @@
 # Changelog
 
-## 0.1.1 (2026-11-26)
+## 0.1.2 (2026-11-26)
+
+Same changes as 0.1.1, which was tagged but never reached npm (the release workflow's npm was too
+old for trusted publishing).
+
+## 0.1.1 (not published)
 
 - The summarizer no longer turns its own instructions, or a pasted credential, into project
   constraints, decisions or next steps.

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.5 (2026-11-26)
 
 - New `tagteam` Agent Skill: tells Claude Code when to read the context, record constraints and decisions,
   save a handoff, and run `tagteam status` before committing. `tagteam run` installs it at

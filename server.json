@@ -3,7 +3,7 @@
   "name": "io.github.MHRabea/tagteam",
   "title": "tagteam",
   "description": "Git-verified handoffs between AI coding agents: task, next step, constraints and drift warnings.",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "websiteUrl": "https://github.com/MHRabea/tagteam",
   "repository": {
     "url": "https://github.com/MHRabea/tagteam",
@@ -14,7 +14,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "tagteam-ai",
-      "version": "0.1.4",
+      "version": "0.1.5",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

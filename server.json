@@ -1,0 +1,39 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.MHRabea/tagteam",
+  "title": "tagteam",
+  "description": "Git-verified handoffs between AI coding agents: task, next step, constraints and drift warnings.",
+  "version": "0.1.4",
+  "websiteUrl": "https://github.com/MHRabea/tagteam",
+  "repository": {
+    "url": "https://github.com/MHRabea/tagteam",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "tagteam-ai",
+      "version": "0.1.4",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp",
+          "description": "Runs the tagteam MCP server on stdio."
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "TAGTEAM_ROOT",
+          "description": "The git repository to work on. Defaults to the directory the client starts the server in.",
+          "isRequired": false,
+          "format": "filepath"
+        }
+      ]
+    }
+  ]
+}

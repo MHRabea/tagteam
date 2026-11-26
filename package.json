@@ -1,7 +1,8 @@
 {
   "name": "tagteam-ai",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Switch AI coding agents mid-task without losing context: git-verified, agent-agnostic handoffs",
+  "mcpName": "io.github.MHRabea/tagteam",
   "author": {
     "name": "Mahmoud Rabea",
     "url": "https://mahmoudrabea96.com"

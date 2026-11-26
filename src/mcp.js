@@ -7,6 +7,9 @@ import * as store from './store.js';
 import { gitRoot, remoteUrl } from './git.js';
 import { redact, redactDeep } from './redact.js';
 import { capture, contextPack, handoffFields, HandoffInput } from './handoff.js';
+import { readFileSync } from 'node:fs';
+
+const VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
 
 const text = (t) => ({ content: [{ type: 'text', text: t }] });
 
@@ -15,7 +18,7 @@ export async function startMcp(cwd) {
   if (!root) throw new Error(`tagteam mcp must run inside a git repository (cwd: ${cwd})`);
   store.ensureProject(root, redact(remoteUrl(root)));
 
-  const server = new McpServer({ name: 'tagteam', version: '0.1.0' });
+  const server = new McpServer({ name: 'tagteam', version: VERSION });
   const clientName = () => server.server.getClientVersion()?.name;
 
   server.registerTool(

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.4 (2026-11-26)
+
+- Ready for the official MCP Registry: `server.json` and `mcpName` (`io.github.MHRabea/tagteam`).
+  Clients can run the server with `npx -y tagteam-ai mcp`.
+- The MCP server reports the package version instead of a fixed `0.1.0`.
+
 ## 0.1.3 (2026-11-26)
 
 The changes listed under 0.1.1. First release published from GitHub Actions through npm trusted

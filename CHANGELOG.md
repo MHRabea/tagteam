@@ -1,6 +1,14 @@
 # Changelog
 
-## 0.1.0 (unreleased)
+## 0.1.1 (2026-11-26)
+
+- The summarizer no longer turns its own instructions, or a pasted credential, into project
+  constraints, decisions or next steps.
+- `tagteam profile list` shows the API endpoint of summarizer-only profiles.
+- README: 30-second demo GIF.
+- First release published from GitHub Actions with npm provenance.
+
+## 0.1.0 (2026-11-26)
 
 First release.
 

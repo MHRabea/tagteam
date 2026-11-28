@@ -1,5 +1,7 @@
 # tagteam
 
+[![npm](https://img.shields.io/npm/v/tagteam-ai)](https://www.npmjs.com/package/tagteam-ai) [![CI](https://github.com/MHRabea/tagteam/actions/workflows/ci.yml/badge.svg)](https://github.com/MHRabea/tagteam/actions/workflows/ci.yml) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE) [![GitHub stars](https://img.shields.io/github/stars/MHRabea/tagteam?style=social)](https://github.com/MHRabea/tagteam)
+
 **Switch AI coding agents in the middle of a task without losing context, and know when a handoff is stale.**
 
 Start a task in Claude Code, continue it on DeepSeek, finish it in Codex. tagteam keeps one git-verified handoff and loads it into whichever agent comes next.
@@ -13,6 +15,8 @@ tagteam
 ![tagteam demo: Claude Code hits its limit, Grok writes the handoff, DeepSeek continues from the next step, and status flags an edit to a protected file](https://raw.githubusercontent.com/MHRabea/tagteam/main/docs/demo.gif)
 
 <sub>The agent sessions are shown as one-line captions. Everything else is real tagteam output, including the handoff written by Grok.</sub>
+
+If tagteam saves you from re-explaining a project, a ⭐ on GitHub helps other developers find it.
 
 ---
 

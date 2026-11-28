@@ -242,7 +242,7 @@ test('native-login codex preset needs no key and sets no provider', () => {
 // as a config path and Claude refused to start whenever a handoff with a task existed.
 test('claude launch puts the start prompt before the flags, never right after --mcp-config', () => {
   const dir = tmp('tagteam-bin-');
-  if (process.platform === 'win32') fs.writeFileSync(path.join(dir, 'claude.cmd'), '"%dp0%\node_modules\@anthropic-ai\claude-code\cli.js" %*');
+  if (process.platform === 'win32') fs.writeFileSync(path.join(dir, 'claude.cmd'), '"%dp0%\\node_modules\\@anthropic-ai\\claude-code\\cli.js" %*');
   else fs.writeFileSync(path.join(dir, 'claude'), '#!/bin/sh\n', { mode: 0o755 });
   const old = process.env.PATH;
   process.env.PATH = `${dir}${path.delimiter}${old}`;

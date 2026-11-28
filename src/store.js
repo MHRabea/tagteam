@@ -73,6 +73,31 @@ export function addConstraint(root, c) {
   });
 }
 
+// Opt-in shared constraints, committed with the repo so teammates and CI see the same rules.
+// This is the only file tagteam ever writes inside a repo, and only with `--shared`.
+export const sharedConstraintsFile = (root) => path.join(root, '.tagteam', 'constraints.json');
+
+export function readSharedConstraints(root) {
+  const list = readJson(sharedConstraintsFile(root), []);
+  if (!Array.isArray(list)) throw new Error(`${sharedConstraintsFile(root)} must hold a JSON array of { text, paths? }`);
+  return list.filter((c) => c && typeof c.text === 'string');
+}
+
+export function addSharedConstraint(root, c) {
+  const list = readSharedConstraints(root);
+  if (list.some((x) => x.text === c.text)) return list;
+  list.push(c);
+  writeJson(sharedConstraintsFile(root), list);
+  return list;
+}
+
+// Shared (repo) rules first, then local ones; a local rule with the same text as a shared one is dropped.
+export function allConstraints(root) {
+  const shared = readSharedConstraints(root).map((c) => ({ ...c, shared: true }));
+  const seen = new Set(shared.map((c) => c.text));
+  return [...shared, ...readConstraints(root).filter((c) => !seen.has(c.text))];
+}
+
 export const readDecisions = (root) => readJson(file(root, 'decisions.json'), []);
 export function addDecision(root, d) {
   return withLock(root, () => {

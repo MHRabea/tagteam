@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.0 (2026-11-28)
+
+- **Auto-switch on a usage limit.** `tagteam --auto-switch` (or `"autoSwitch": true` in `profiles.json`)
+  starts the next profile by itself when the session ended on a usage or rate limit. The limit is read from
+  the end of the agent's own transcript (Claude Code limit and API-error messages, Codex error events), so a
+  chat about rate limits never triggers it. Each profile is auto-skipped at most once per run. Without the
+  flag, tagteam now says when a session ended on a limit and still asks.
+- **Handoff check.** Handoffs are checked for a task, one concrete next action, test status and progress.
+  The MCP `save_handoff` tool returns the gaps to the agent so it can save again; the context pack and
+  `tagteam status` list remaining gaps. Advisory: it never changes an exit code.
+- **Team rules.** `tagteam constraint ... --shared` (and `add_constraint` with `shared: true`) saves the rule
+  in `.tagteam/constraints.json` in the repo, so every teammate's agent and CI get it. Local and shared
+  rules are merged; this is the only file tagteam writes in a repo, and only when asked.
+- **`tagteam check [--base ref]`** for CI and pre-push: files changed on the branch against the rules, exit 2
+  on a hit, GitHub annotations under Actions. Needs no saved handoff.
+- **GitHub Action** (`uses: MHRabea/tagteam@v0.2.0`): fails a pull request that touches a protected path.
+- README leads with the full loop; 100 tests.
+
 ## 0.1.5 (2026-11-26)
 
 - New `tagteam` Agent Skill: tells Claude Code when to read the context, record constraints and decisions,

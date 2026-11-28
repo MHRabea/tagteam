@@ -2,14 +2,15 @@
 
 [![npm](https://img.shields.io/npm/v/tagteam-ai)](https://www.npmjs.com/package/tagteam-ai) [![CI](https://github.com/MHRabea/tagteam/actions/workflows/ci.yml/badge.svg)](https://github.com/MHRabea/tagteam/actions/workflows/ci.yml) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE) [![GitHub stars](https://img.shields.io/github/stars/MHRabea/tagteam?style=social)](https://github.com/MHRabea/tagteam)
 
-**Switch AI coding agents in the middle of a task without losing context, and know when a handoff is stale.**
+**When your AI coding agent stops mid-task, the next one picks up from the exact next step, and is told what changed since.**
 
-Start a task in Claude Code, continue it on DeepSeek, finish it in Codex. tagteam keeps one git-verified handoff and loads it into whichever agent comes next.
+Claude Code hits its usage limit. tagteam saves a structured handoff (task, what's done, the ONE next step, rules, test status), stamps it with the git state, and starts your next agent with it: Claude Code on another provider like DeepSeek, Codex, or any command. If the code changed in between, the next agent is warned before it trusts the handoff.
 
 ```powershell
 npm i -g tagteam-ai
 tagteam profile add claude
-tagteam
+tagteam profile add deepseek --key      # or any provider you already pay for
+tagteam --auto-switch                   # on a usage limit, continue on the next profile by itself
 ```
 
 ![tagteam demo: Claude Code hits its limit, Grok writes the handoff, DeepSeek continues from the next step, and status flags an edit to a protected file](https://raw.githubusercontent.com/MHRabea/tagteam/main/docs/demo.gif)
@@ -17,6 +18,17 @@ tagteam
 <sub>The agent sessions are shown as one-line captions. Everything else is real tagteam output, including the handoff written by Grok.</sub>
 
 If tagteam saves you from re-explaining a project, a ⭐ on GitHub helps other developers find it.
+
+### The loop, without you doing anything
+
+1. You run `tagteam` instead of `claude`. The agent starts with the saved context: task, next action, rules, drift warnings.
+2. The session ends: usage limit, crash, closed window, or you just want a second opinion.
+3. **A handoff is always saved.** The agent writes it (`/handoff`, MCP, or the auto-save on `/compact` and exit). If it couldn't, a cheap model from your other profiles writes it from the redacted transcript and diff. If every provider is down, tagteam still saves the git state and your last messages.
+4. **The handoff is checked.** Missing pieces ("no test status", "next action is vague") are reported to the agent while it can still fix them, and to the next one.
+5. **The next agent starts.** tagteam proposes the next profile in your chain, or with `--auto-switch` starts it by itself when the session ended on a usage limit.
+6. **It continues from the next step**, with a warning if commits or edits happened since the handoff.
+
+Your own keys and logins only: tagteam never shares, stores or switches subscription logins.
 
 ---
 
@@ -37,9 +49,12 @@ tagteam fixes all four with a small local CLI.
 |---|:-:|:-:|:-:|:-:|
 | Works across different agents (Claude Code, Codex, any MCP client) | – | partial | – | ✅ |
 | **Drift detection:** warns when the repo changed since the handoff | – | – | – | ✅ |
-| **Guardrails:** constraints bound to file paths, checked against your diff | – | – | – | ✅ |
-| Handoff written even when the agent hit its limit | – | – | – | ✅ |
-| Nothing added to your repo | ✅ | – | ✅ | ✅ |
+| **Handoff check:** tells the agent what its handoff is missing, while it can still fix it | – | – | – | ✅ |
+| Handoff written even when the agent hit its limit or crashed | – | – | – | ✅ |
+| **Auto-switch** to the next agent on a detected usage limit (opt-in) | – | – | partial | ✅ |
+| **Guardrails:** rules bound to file paths, checked against your diff | – | – | – | ✅ |
+| **Team rules in CI:** the same rules fail a pull request (GitHub Action) | – | – | – | ✅ |
+| Nothing added to your repo (unless you opt in to shared rules) | ✅ | – | ✅ | ✅ |
 | Secrets redacted before anything is saved | n/a | – | n/a | ✅ |
 
 ### Drift detection
@@ -58,11 +73,44 @@ Every handoff records the branch, HEAD and dirty files. When the next session st
 tagteam constraint "Do not change the payment gateway interface" --paths "src/payments/gateway.*"
 ```
 
-Every agent sees the rule at session start. `tagteam status` flags any diff that touches those paths and exits with code 2, so you can use it in CI or as a pre-commit hook.
+Every agent sees the rule at session start, and `tagteam status` flags any diff that touches those paths (exit code 2).
+
+### Team rules that also guard your pull requests
+
+Add `--shared` and the rule goes into `.tagteam/constraints.json` in the repo (the only file tagteam ever writes there, and only when you ask). Commit it: every teammate's agent gets the rule, and CI enforces it.
+
+```powershell
+tagteam constraint "Payments code changes need a review from the payments team" --paths "src/payments/**" --shared
+tagteam check --base main     # files changed on this branch vs the rules; exit 2 on a hit
+```
+
+On GitHub, add the action to any workflow. A pull request that touches a protected path fails, with an annotation on each file:
+
+```yaml
+on: pull_request
+jobs:
+  guardrails:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: MHRabea/tagteam@v0.2.0
+```
+
+The same rule your AI agent was told about at session start is the one your CI checks, so an agent (or a person) can't quietly change a file you protected.
 
 ### A handoff that survives rate limits
 
 When an agent exits without saving a handoff (limit hit, crash, window closed), a cheap model from one of your other profiles writes it. That model gets the redacted transcript and the diff. If no other profile has a key, tagteam saves the git state and your last messages.
+
+### Auto-switch on a usage limit
+
+`tagteam --auto-switch` (or `"autoSwitch": true` in `~/.tagteam/profiles.json`) starts the next profile by itself when the session ended on a usage or rate limit. tagteam reads it from the end of the agent's own transcript (Claude Code's limit and API-error messages, Codex error events), not from guesses: a session that merely talks about rate limits never triggers it. Each profile is skipped at most once per run, so if every provider is limited, tagteam stops and asks.
+
+### Handoff check
+
+A handoff with "next: continue" is not a handoff. tagteam checks each one for a task, ONE concrete next action, test status and listed progress. When the agent saves through MCP, it gets the gaps back immediately ("No test status: the next agent cannot tell whether the code currently passes") and can save again. The next agent sees any remaining gaps, and so does `tagteam status`. The check is advisory: it never fails a build.
 
 ## How it works
 
@@ -72,7 +120,8 @@ tagteam ──▶ agent (Claude Code / Codex / custom)
    │           │  MCP tool save_handoff ──────────────▶ handoff.json (git-stamped, redacted)
    │           ▼
    └── on exit: handoff saved? no → summarizer (another provider) → fallback: git state
-        then: Continue with "deepseek"? [Enter]
+        usage limit + --auto-switch? → start the next profile
+        otherwise: Continue with "deepseek"? [Enter]
 ```
 
 - **Claude Code:** hooks and MCP are passed with `--settings` and `--mcp-config`. Nothing is written into your repo.
@@ -112,12 +161,13 @@ tagteam profile add other  --agent custom --command "my-agent --prompt-file {con
 
 | Command | |
 |---|---|
-| `tagteam` / `tagteam run [profile]` | Start an agent with the saved context. On exit, save a handoff and offer the next profile |
-| `tagteam status` | Drift and guardrail report (exit 2 on warnings) |
+| `tagteam` / `tagteam run [profile]` | Start an agent with the saved context. On exit, save a handoff and offer the next profile. `--auto-switch`: move on by itself after a usage limit |
+| `tagteam status` | Drift, guardrail and completeness report (exit 2 on drift or a guardrail hit) |
+| `tagteam check [--base ref]` | For CI and pre-push: files changed on the branch vs the rules (exit 2 on a hit). Needs no saved handoff |
 | `tagteam doctor` | Check node, git, agents, keys and the repo (exit 1 on problems) |
 | `tagteam resume` | Print the context pack |
 | `tagteam log` / `tagteam show [id]` | Handoff history |
-| `tagteam constraint` / `tagteam decision` | Add a rule or record a decision |
+| `tagteam constraint` / `tagteam decision` | Add a rule (`--shared`: for the whole team, in the repo) or record a decision |
 | `tagteam install claude\|codex\|cursor` | Permanent per-repo wiring, if you run agents without `tagteam` |
 | `tagteam mcp` | MCP server: `get_context`, `save_handoff`, `add_decision`, `add_constraint`, `update_memory`, `list_handoffs` |
 
@@ -125,7 +175,7 @@ In Claude Code, `/handoff` saves a handoff written by the agent itself, and the 
 
 ## Security and privacy
 
-- **Local-first:** data lives in `~/.tagteam/` and never enters your repo.
+- **Local-first:** data lives in `~/.tagteam/` and never enters your repo. The one exception is opt-in: `--shared` rules go to `.tagteam/constraints.json` so you can commit them.
 - **Keys:** kept in the OS key store: Windows DPAPI, macOS Keychain or Linux Secret Service (`secret-tool`). `profiles.json` holds only ciphertext or a reference. A key reaches the agent only through an environment variable, never as an argument.
 - **Logins:** tagteam never reads, stores or switches subscription logins. The `claude` profile uses Claude Code's own login.
 - **Redaction:** API keys, tokens, passwords, private keys and credentials in URLs are redacted before anything is saved or sent.
@@ -133,13 +183,12 @@ In Claude Code, `/handoff` saves a handoff written by the agent itself, and the 
 
 ## Status
 
-`0.1`, early. Tested live on Windows; CI runs the test suite on Windows, macOS and Linux. Saves are locked per repo, so two agents or hooks saving at once never overwrite each other. See [SECURITY.md](SECURITY.md) and [CHANGELOG.md](CHANGELOG.md).
+`0.2`, early. Tested live on Windows; CI runs the test suite (100 tests, with fake agents and a mock provider) on Windows, macOS and Linux. Saves are locked per repo, so two agents or hooks saving at once never overwrite each other. See [SECURITY.md](SECURITY.md) and [CHANGELOG.md](CHANGELOG.md).
 
 Roadmap:
-- switch automatically when an agent hits its limit
 - VS Code status bar
 - cost per task
-- team handoffs
+- team handoffs (shared rules shipped in 0.2)
 
 ## License
 

@@ -13,6 +13,6 @@ Save a handoff for this repo now. Call the `save_handoff` tool of the `tagteam` 
 - `decisions`: only new design decisions from this session, each with why.
 - `constraints`: only new rules the user stated that must not be broken. Add `paths` globs when a rule protects specific files.
 
-Do not invent progress. If the MCP tool is not available, pipe the same JSON to `tagteam capture --json --agent claude-code` with Bash.
+If the tool answers with gaps (for example "No test status"), fill in the ones you know and save again. Do not invent progress. If the MCP tool is not available, pipe the same JSON to `tagteam capture --json --agent claude-code` with Bash.
 
 $ARGUMENTS

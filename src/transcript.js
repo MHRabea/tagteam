@@ -75,3 +75,38 @@ export function findCodexTranscript(since) {
   }
   return best?.f ?? null;
 }
+
+// Did the session end on a usage/rate limit? Looks only at the last message the agent produced
+// (Claude Code) or the last error event (Codex), so a chat that merely mentions rate limits never matches.
+const LIMIT =
+  /(usage limit|limit reached|(hit|reached) your (usage |weekly |daily )?limit|rate[ _-]?limit|\b429\b|credit balance is too low|insufficient[ _]quota|quota exceeded|out of credits?)/i;
+
+export function detectLimit(file) {
+  let text;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch {
+    return null;
+  }
+  const lines = text.split('\n').filter((l) => l.trim()).slice(-40).reverse();
+  for (const line of lines) {
+    let e;
+    try {
+      e = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    // Codex: { type: 'event_msg', payload: { type: 'error', message } }
+    if (e.type === 'event_msg' && e.payload?.type === 'error') {
+      const m = String(e.payload.message ?? '');
+      return LIMIT.test(m) ? m.slice(0, 200) : null;
+    }
+    if (e.type === 'assistant' && e.message && !e.isSidechain) {
+      const t = partsText(e.message.content).trim();
+      if (!t) continue; // tool-use only turn: keep looking back for the last text
+      return LIMIT.test(t) && (e.isApiErrorMessage || t.length < 300) ? t.slice(0, 200) : null;
+    }
+    if (e.type === 'response_item' && e.payload?.type === 'message' && e.payload.role === 'assistant') return null;
+  }
+  return null;
+}

@@ -1,0 +1,31 @@
+name: tagteam check
+description: Fail a pull request that touches paths protected by the repo's tagteam constraints (.tagteam/constraints.json).
+author: Mahmoud Rabea
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  base:
+    description: Git ref to diff against. Defaults to the pull request's base commit, or the previous commit on a push.
+    required: false
+    default: ''
+  version:
+    description: tagteam-ai version from npm.
+    required: false
+    default: latest
+
+runs:
+  using: composite
+  steps:
+    - name: Check protected paths
+      shell: bash
+      env:
+        INPUT_BASE: ${{ inputs.base }}
+        PR_BASE: ${{ github.event.pull_request.base.sha }}
+        PUSH_BEFORE: ${{ github.event.before }}
+        TAGTEAM_VERSION: ${{ inputs.version }}
+      run: |
+        base="${INPUT_BASE:-${PR_BASE:-$PUSH_BEFORE}}"
+        if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then base="HEAD~1"; fi
+        npx -y -p "tagteam-ai@${TAGTEAM_VERSION}" tagteam check --base "$base"

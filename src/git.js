@@ -62,3 +62,9 @@ export function filesChangedSince(root, sha) {
   const out = tryGit(root, 'diff', '--name-only', sha, 'HEAD');
   return out === null ? null : out.split('\n').filter(Boolean);
 }
+
+// Files changed on this branch since it left <base> (three-dot: merge-base..HEAD), like a PR diff.
+export function filesChangedInRange(root, base) {
+  const out = tryGit(root, 'diff', '--name-only', `${base}...HEAD`);
+  return out === null ? null : out.split('\n').filter(Boolean);
+}

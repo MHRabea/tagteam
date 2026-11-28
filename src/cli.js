@@ -3,7 +3,7 @@ import { parseArgs } from 'node:util';
 import * as store from './store.js';
 import { gitRoot, remoteUrl } from './git.js';
 import { redact } from './redact.js';
-import { capture, contextPack, statusReport, renderHandoff, HandoffInput } from './handoff.js';
+import { capture, contextPack, statusReport, renderHandoff, HandoffInput, checkRange } from './handoff.js';
 import { recentUserMessages } from './transcript.js';
 import { installClaude, installCodex, installCursor } from './install.js';
 import { PRESETS, readConfig, buildProfile, saveProfile, removeProfile, setChain, promptHidden, needsKey } from './profiles.js';
@@ -12,7 +12,9 @@ const HELP = `tagteam — git-verified session handoffs for AI coding agents
 
 Usage:
   tagteam                               Start the first profile of your chain here (same as tagteam run)
-  tagteam run [profile] [--no-summary]  Start an agent with the saved context; on exit save a handoff and offer the next profile
+  tagteam run [profile] [--no-summary] [--auto-switch]
+                                        Start an agent with the saved context; on exit save a handoff and offer the next
+                                        profile. --auto-switch: if it stopped on a usage limit, start the next one without asking
   tagteam profile add <name> [--key] [--preset p] [--agent claude|codex|custom] [--base-url u] [--model m] [--command c]
   tagteam profile list | rm <name>      Presets: ${Object.keys(PRESETS).join(', ')}
   tagteam chain a,b,c                   Profile order used when switching
@@ -21,10 +23,11 @@ Usage:
   tagteam install claude|codex|cursor   Wire tagteam into an agent for this repo
   tagteam capture [--json] [--agent n]  Save a handoff (--json: read handoff fields from stdin)
   tagteam resume                        Print the context pack (task, constraints, drift)
-  tagteam status                        Drift and guardrail report (exit 2 on warnings)
+  tagteam status                        Drift, guardrail and completeness report (exit 2 on drift or guardrail hits)
+  tagteam check [--base <ref>]          CI/pre-push: files changed since <ref> (default origin/HEAD) vs constraints (exit 2 on hits)
   tagteam log                           List handoffs
   tagteam show [id]                     Show a handoff (default: latest)
-  tagteam constraint "<text>" [--paths "a/**,b"]
+  tagteam constraint "<text>" [--paths "a/**,b"] [--shared]   --shared: save in .tagteam/constraints.json (commit it)
   tagteam decision "<text>" [--why "..."]
   tagteam mcp                           Start the MCP server (stdio)
   tagteam doctor                        Check node, git, agents, keys and the repo (exit 1 on problems)
@@ -52,6 +55,9 @@ const { values: opt, positionals } = parseArgs({
     command: { type: 'string' },
     'summary-model': { type: 'string' },
     'no-summary': { type: 'boolean' },
+    'auto-switch': { type: 'boolean' },
+    shared: { type: 'boolean' },
+    base: { type: 'string' },
   },
 });
 const [cmd, ...args] = positionals;
@@ -91,7 +97,7 @@ async function main() {
       const root = requireRoot();
       register(root);
       const { run } = await import('./launcher.js');
-      return run(root, { profile: args[0], summary: !opt['no-summary'] });
+      return run(root, { profile: args[0], summary: !opt['no-summary'], autoSwitch: Boolean(opt['auto-switch'] || readConfig().autoSwitch) });
     }
 
     case 'profile': {
@@ -193,6 +199,23 @@ async function main() {
       return;
     }
 
+    case 'check': {
+      const root = requireRoot();
+      const base = opt.base || 'origin/HEAD';
+      const { files, constraints, violations } = checkRange(root, base);
+      const guarded = constraints.filter((c) => c.paths?.length).length;
+      console.log(`tagteam check: ${files.length} changed file(s) since ${base}, ${guarded} path rule(s).`);
+      if (!guarded) console.log('No path constraints found. Add shared ones with: tagteam constraint "<rule>" --paths "src/x/**" --shared');
+      for (const v of violations) {
+        console.log(`✗ "${v.constraint}"\n    touched: ${v.files.join(', ')}`);
+        // GitHub Actions turns these into annotations on the PR's changed files.
+        if (process.env.GITHUB_ACTIONS) for (const f of v.files) console.log(`::error file=${f},title=tagteam constraint::${v.constraint.replace(/[\r\n]+/g, ' ')}`);
+      }
+      if (violations.length) process.exitCode = 2;
+      else console.log('✓ No protected path was touched.');
+      return;
+    }
+
     case 'log': {
       const root = requireRoot();
       const ids = store.listHandoffs(root).slice(0, 20);
@@ -216,7 +239,12 @@ async function main() {
       if (!args[0]) throw new Error('Usage: tagteam constraint "<text>" [--paths "a/**,b"]');
       register(root);
       const paths = opt.paths?.split(',').map((p) => p.trim()).filter(Boolean);
-      store.addConstraint(root, { text: redact(args[0]), ...(paths?.length ? { paths } : {}) });
+      const c = { text: redact(args[0]), ...(paths?.length ? { paths } : {}) };
+      if (opt.shared) {
+        store.addSharedConstraint(root, c);
+        return console.log(`Shared constraint saved to ${store.sharedConstraintsFile(root)}. Commit it so teammates and CI (tagteam check) get it.`);
+      }
+      store.addConstraint(root, c);
       return console.log('Constraint saved.');
     }
 

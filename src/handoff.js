@@ -1,7 +1,7 @@
 // Handoff model: capture, drift + guardrail checks, and the context pack rendered for agents.
 import { z } from 'zod';
 import * as store from './store.js';
-import { gitState, isAncestor, commitsSince, filesChangedSince } from './git.js';
+import { gitState, isAncestor, commitsSince, filesChangedSince, filesChangedInRange } from './git.js';
 import { redactDeep } from './redact.js';
 
 const strList = z.array(z.string()).default([]);
@@ -153,6 +153,24 @@ export function checkGuardrails(constraints, files) {
     .filter((v) => v.files.length);
 }
 
+// What a handoff is missing for the next agent to start without exploring. Advisory only: never fails status.
+const VAGUE = /^(continue|keep going|carry on|finish( up)?( the task| it)?|next steps?|tbd|todo|wip|same as before|see above)\b/i;
+export function handoffGaps(h) {
+  if (!h) return [];
+  if (h.source === 'auto' && !h.carried_from) {
+    return ['Only git state and recent messages were saved (no agent or summarizer wrote this handoff). Ask the agent to run /handoff.'];
+  }
+  const gaps = [];
+  if (!h.task?.title?.trim()) gaps.push('No task title.');
+  const next = h.next_action?.trim() ?? '';
+  if (!next) gaps.push('No next action: the next agent will have to work out where to start.');
+  else if (next.length < 25 || VAGUE.test(next)) gaps.push(`Next action is vague ("${next.slice(0, 60)}"): name the file, function or command to start with.`);
+  if (!h.tests) gaps.push('No test status: the next agent cannot tell whether the code currently passes.');
+  else if (h.tests.result === 'fail' && !h.known_issues?.length && !h.tests.notes) gaps.push('Tests fail but no failure is described in known_issues or tests.notes.');
+  if (!h.completed?.length && !h.in_progress?.length) gaps.push('Nothing listed as completed or in progress.');
+  return gaps;
+}
+
 // Files touched since the handoff: committed since its HEAD plus current uncommitted changes.
 export function touchedFiles(root, h, now) {
   const base = h?.fields_git || h?.git;
@@ -193,11 +211,12 @@ export function renderHandoff(h) {
 export function contextPack(root) {
   const h = store.latestHandoff(root);
   const now = gitState(root);
-  const constraints = store.readConstraints(root);
+  const constraints = store.allConstraints(root);
   const decisions = store.readDecisions(root);
   const memory = store.readMemory(root).trim();
   const drift = h ? computeDrift(root, h, now) : [];
   const guard = checkGuardrails(constraints, touchedFiles(root, h, now));
+  const gaps = handoffGaps(h);
 
   const out = [];
   if (drift.length) out.push(`## ⚠ Drift since handoff — verify before trusting it\n${bullets(drift)}`);
@@ -208,6 +227,7 @@ export function contextPack(root) {
     out.push(`## Constraints (do not violate)\n${bullets(constraints.map((c) => c.text + (c.paths?.length ? ` [${c.paths.join(', ')}]` : '')))}`);
   }
   if (h) out.push(renderHandoff(h));
+  if (gaps.length) out.push(`### Handoff gaps — confirm these with the code or the user before relying on the handoff\n${bullets(gaps)}`);
   if (decisions.length) {
     out.push(`## Recent decisions\n${bullets(decisions.slice(-10).map((d) => `${d.date}: ${d.decision}${d.why ? ` — ${d.why}` : ''}`))}`);
   }
@@ -222,9 +242,21 @@ export function statusReport(root) {
   const h = store.latestHandoff(root);
   const now = gitState(root);
   const drift = h ? computeDrift(root, h, now) : [];
-  const guard = checkGuardrails(store.readConstraints(root), touchedFiles(root, h, now));
+  const guard = checkGuardrails(store.allConstraints(root), touchedFiles(root, h, now));
+  const gaps = handoffGaps(h);
   const out = [h ? `Latest handoff: ${h.id} (${h.source}, ${h.reason})` : 'No handoff saved yet.'];
   out.push(drift.length ? `Drift:\n${bullets(drift)}` : h ? 'Drift: none' : '');
   out.push(guard.length ? `Guardrails:\n${bullets(guard.map((g) => `"${g.constraint}" — touched: ${list(g.files)}`))}` : 'Guardrails: ok');
-  return { text: out.filter(Boolean).join('\n'), ok: !drift.length && !guard.length };
+  if (h) out.push(gaps.length ? `Completeness (advisory):\n${bullets(gaps)}` : 'Completeness: ok');
+  return { text: out.filter(Boolean).join('\n'), ok: !drift.length && !guard.length, gaps };
+}
+
+// CI check: files changed between <base> and HEAD (plus uncommitted ones) against the repo's shared
+// constraints and, if present, local ones. Needs no saved handoff, so it works on a fresh checkout.
+export function checkRange(root, base) {
+  const committed = filesChangedInRange(root, base);
+  if (committed === null) throw new Error(`Cannot diff against "${base}". In CI, check out with fetch-depth: 0 (or fetch the base commit).`);
+  const files = [...new Set([...committed, ...gitState(root).dirty_files])];
+  const constraints = store.allConstraints(root);
+  return { files, constraints, violations: checkGuardrails(constraints, files) };
 }

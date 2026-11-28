@@ -11,7 +11,7 @@ import { gitState } from './git.js';
 import { capture, contextPack } from './handoff.js';
 import { mergeHook, HOOKS } from './install.js';
 import { readConfig, decryptKey, needsKey } from './profiles.js';
-import { readTranscript, recentUserMessages, findCodexTranscript } from './transcript.js';
+import { readTranscript, recentUserMessages, findCodexTranscript, detectLimit } from './transcript.js';
 import { summarize } from './summarize.js';
 
 const CLI = fileURLToPath(new URL('./cli.js', import.meta.url));
@@ -185,14 +185,21 @@ export function agentSavedSince(h, started) {
   return Boolean(h.fields_at && Date.parse(h.fields_at) >= started);
 }
 
+// Transcript of the session that just ended: Claude Code's comes from the SessionEnd hook's save, Codex's from its sessions dir.
+export function sessionTranscript(p, started, latest) {
+  const fresh = latest && Date.parse(latest.created_at) >= started;
+  if (p.agent === 'claude') return fresh ? latest.transcript_path ?? null : null;
+  if (p.agent === 'codex') return findCodexTranscript(started);
+  return null;
+}
+
 export async function ensureHandoff(root, { name, p, started, summary, cfg, log = console.log }) {
   const latest = latestHandoff(root);
   if (agentSavedSince(latest, started) && latest.source !== 'summary') {
     log(`✓ tagteam: the agent saved handoff ${latest.carried_from || latest.id}`);
     return latest;
   }
-  const fresh = latest && Date.parse(latest.created_at) >= started;
-  const tp = p.agent === 'claude' ? (fresh ? latest.transcript_path : null) : p.agent === 'codex' ? findCodexTranscript(started) : null;
+  const tp = sessionTranscript(p, started, latest);
   const transcript = tp ? readTranscript(tp) : [];
   const hasWork = transcript.length || gitState(root).dirty_files.length;
 
@@ -229,10 +236,13 @@ async function askNext(cfg, next) {
 }
 
 // ask and log are replaceable so the whole loop can run under test without a terminal.
-export async function run(root, { profile, summary = true, ask = askNext, log = console.log } = {}) {
+// autoSwitch: when the session ended on a usage/rate limit, start the next profile without asking.
+// Each profile is auto-skipped at most once per run, so a chain where every provider is limited stops and asks.
+export async function run(root, { profile, summary = true, autoSwitch = false, ask = askNext, log = console.log } = {}) {
   const cfg = readConfig();
   if (!Object.keys(cfg.profiles).length) throw new Error('No profiles yet. Start with: tagteam profile add claude');
   let name = profile || cfg.chain[0];
+  const limited = new Set();
   while (name) {
     const p = cfg.profiles[name];
     if (!p) throw new Error(`No profile named "${name}". See: tagteam profile list`);
@@ -244,7 +254,19 @@ export async function run(root, { profile, summary = true, ask = askNext, log = 
     log(`\n▶ tagteam: starting ${name} (${p.agent}) in ${root}`);
     const code = await launch(buildLaunch(p, root, key, name), root);
     log(`\n■ tagteam: ${name} exited (code ${code}).`);
-    await ensureHandoff(root, { name, p, started, summary, cfg, log });
-    name = await ask(cfg, nextInChain(cfg.chain, name));
+    const h = await ensureHandoff(root, { name, p, started, summary, cfg, log });
+    const next = nextInChain(cfg.chain, name);
+    const tp = sessionTranscript(p, started, latestHandoff(root)) ?? h?.transcript_path ?? null;
+    const limit = tp ? detectLimit(tp) : null;
+    if (limit) {
+      limited.add(name);
+      log(`! tagteam: ${name} stopped on a usage limit ("${limit.replace(/\s+/g, ' ').slice(0, 100)}").`);
+    }
+    if (autoSwitch && limit && next && next !== name && !limited.has(next)) {
+      log(`↪ tagteam: --auto-switch: continuing with ${next}.`);
+      name = next;
+      continue;
+    }
+    name = await ask(cfg, next);
   }
 }

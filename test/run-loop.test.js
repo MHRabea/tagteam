@@ -84,6 +84,9 @@ test('claude: hooks and MCP from tagteam work; an agent-saved handoff needs no s
   assert.deepEqual(r.hookErrors, []);
   assert.equal(r.env.CLAUDECODE, undefined, 'parent session marker must be stripped');
   assert.match(r.saved, /Saved handoff/);
+  // The fake saves no test status, so the MCP answer tells the agent so while it can still fix it.
+  assert.match(r.saved, /Gaps the next agent will hit:/);
+  assert.match(r.saved, /- No test status/);
   const h = store.latestHandoff(ctx.root);
   assert.equal(h.source, 'agent');
   assert.equal(h.agent, 'fake-claude');
@@ -197,4 +200,68 @@ test('codex silent exit: its rollout transcript feeds the summarizer', async () 
   assert.match(ctx.mock.seen[0].body, /swapped the division/);
   assert.ok(!ctx.mock.seen[0].body.includes(SECRET));
   assert.equal(store.latestHandoff(ctx.root).source, 'summary');
+});
+
+// A Claude session that ends on the usage-limit message, as Claude Code writes it to the transcript.
+function limitTranscript() {
+  const f = path.join(process.env.FAKE_DIR, 'limit-transcript.json');
+  fs.writeFileSync(f, JSON.stringify([
+    { role: 'user', text: 'Fix the prorate bug in src/billing.js' },
+    { role: 'assistant', text: 'Claude AI usage limit reached|1795000000' },
+  ]));
+  process.env.FAKE_TRANSCRIPT = f;
+}
+
+test('--auto-switch: a usage limit starts the next profile without asking, with the handoff', async () => {
+  ctx.mock = await mockProvider({});
+  profiles(ctx.mock.url);
+  writeConfig({ ...readConfig(), chain: ['claude', 'ds'] });
+  limitTranscript();
+  process.env.FAKE_MODE = 'limit,save';
+  let asked = 0;
+  await run(ctx.root, { autoSwitch: true, ask: async () => (asked++, null), log: ctx.log });
+
+  const [first, second] = runs();
+  assert.equal(first.mode, 'limit');
+  assert.equal(second.env.ANTHROPIC_BASE_URL, 'https://api.deepseek.com/anthropic', 'second run is the ds profile');
+  assert.ok(second.context.includes(REPLY.next_action), 'ds starts from the handoff');
+  assert.ok(ctx.lines.some((l) => /claude stopped on a usage limit/.test(l)));
+  assert.ok(ctx.lines.some((l) => /--auto-switch: continuing with ds/.test(l)));
+  assert.equal(asked, 1, 'asked only after ds, which did not hit a limit');
+});
+
+test('--auto-switch: when every profile is limited it stops and asks instead of looping', async () => {
+  ctx.mock = await mockProvider({});
+  profiles(ctx.mock.url);
+  writeConfig({ ...readConfig(), chain: ['claude', 'ds'] });
+  limitTranscript();
+  process.env.FAKE_MODE = 'limit';
+  let asked = 0;
+  await run(ctx.root, { autoSwitch: true, ask: async () => (asked++, null), log: ctx.log });
+  assert.equal(runs().length, 2);
+  assert.equal(asked, 1);
+});
+
+test('without --auto-switch a limit is reported but the user still chooses', async () => {
+  ctx.mock = await mockProvider({});
+  profiles(ctx.mock.url);
+  writeConfig({ ...readConfig(), chain: ['claude', 'ds'] });
+  limitTranscript();
+  process.env.FAKE_MODE = 'limit';
+  let asked = 0;
+  await run(ctx.root, { ask: async () => (asked++, null), log: ctx.log });
+  assert.equal(runs().length, 1);
+  assert.equal(asked, 1);
+  assert.ok(ctx.lines.some((l) => /claude stopped on a usage limit/.test(l)));
+});
+
+test('--auto-switch ignores an ordinary exit', async () => {
+  ctx.mock = await mockProvider({});
+  profiles(ctx.mock.url);
+  writeConfig({ ...readConfig(), chain: ['claude', 'ds'] });
+  process.env.FAKE_MODE = 'silent';
+  let asked = 0;
+  await run(ctx.root, { autoSwitch: true, ask: async () => (asked++, null), log: ctx.log });
+  assert.equal(runs().length, 1);
+  assert.equal(asked, 1);
 });

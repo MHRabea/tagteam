@@ -6,7 +6,7 @@ import { z } from 'zod';
 import * as store from './store.js';
 import { gitRoot, remoteUrl } from './git.js';
 import { redact, redactDeep } from './redact.js';
-import { capture, contextPack, handoffFields, HandoffInput } from './handoff.js';
+import { capture, contextPack, handoffFields, HandoffInput, handoffGaps } from './handoff.js';
 import { readFileSync } from 'node:fs';
 
 const VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
@@ -35,7 +35,12 @@ export async function startMcp(cwd) {
     },
     async ({ agent, ...fields }) => {
       const h = capture(root, { source: 'agent', reason: 'manual', agent: agent || clientName(), fields: HandoffInput.parse(fields) });
-      return text(`Saved handoff ${h.id} at ${h.git.branch ?? 'no branch'}@${h.git.head?.slice(0, 7) ?? 'none'}.`);
+      const saved = `Saved handoff ${h.id} at ${h.git.branch ?? 'no branch'}@${h.git.head?.slice(0, 7) ?? 'none'}.`;
+      const gaps = handoffGaps(h);
+      // Tell the agent right away, while it still has the context to fill the gaps.
+      if (!gaps.length) return text(saved);
+      const listed = gaps.map((g) => `- ${g}`).join('\n');
+      return text(`${saved}\nGaps the next agent will hit:\n${listed}\nIf you know these, call save_handoff again with them.`);
     },
   );
 
@@ -51,10 +56,15 @@ export async function startMcp(cwd) {
   server.registerTool(
     'add_constraint',
     {
-      description: 'Record a rule from the user that must never be broken. paths: globs of files the rule protects (guardrail warnings fire when they change).',
-      inputSchema: { text: z.string(), paths: z.array(z.string()).optional() },
+      description:
+        'Record a rule from the user that must never be broken. paths: globs of files the rule protects (guardrail warnings fire when they change). shared: true only when the user asks for a team-wide rule; it is written to .tagteam/constraints.json in the repo, where teammates and CI (tagteam check) see it.',
+      inputSchema: { text: z.string(), paths: z.array(z.string()).optional(), shared: z.boolean().optional() },
     },
-    async (c) => {
+    async ({ shared, ...c }) => {
+      if (shared) {
+        store.addSharedConstraint(root, redactDeep(c));
+        return text('Shared constraint saved to .tagteam/constraints.json. Commit that file so teammates and CI get it.');
+      }
       store.addConstraint(root, redactDeep(c));
       return text('Constraint saved.');
     },

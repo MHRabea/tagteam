@@ -16,7 +16,7 @@ tagteam saves a structured, git-verified handoff per repo so the next session (t
 
 ## While working
 
-- The user states a lasting rule ("don't touch the gateway", "no new dependencies"): call `add_constraint` with the rule and, when it protects specific files, `paths` globs.
+- The user states a lasting rule ("don't touch the gateway", "no new dependencies"): call `add_constraint` with the rule and, when it protects specific files, `paths` globs. Pass `shared: true` only when the user wants the rule for the whole team: it goes into `.tagteam/constraints.json` in the repo, where teammates and CI (`tagteam check`) see it.
 - You and the user settle a design choice: call `add_decision` with the decision and why.
 - Stable facts about the project (architecture, conventions, how to run things) belong in `update_memory`, not in a handoff.
 
@@ -31,11 +31,11 @@ Call `save_handoff`. Fill it from what actually happened, not from plans:
 - `known_issues`: failing tests by name, errors quoted exactly, open questions.
 - `tests`: the last command you ran and its real result (`pass`, `fail`, or `not_run`).
 
-Never invent progress or test results. Save a handoff before a long-running or risky step too: if the session dies, the next agent starts from there.
+If `save_handoff` answers with "Gaps the next agent will hit", fill in the ones you know and save again. Never invent progress or test results. Save a handoff before a long-running or risky step too: if the session dies, the next agent starts from there.
 
 ## Before committing
 
-Run `tagteam status`. Exit code 2 means drift or a guardrail hit: show the user the warnings and do not commit files that break a constraint without their go-ahead.
+Run `tagteam status` (or `tagteam check --base main` to check the whole branch against the constraints). Exit code 2 means drift or a guardrail hit: show the user the warnings and do not commit files that break a constraint without their go-ahead.
 
 ## Without the MCP server
 

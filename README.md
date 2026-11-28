@@ -205,7 +205,8 @@ tagteam profile add other  --agent custom --command "my-agent --prompt-file {con
 | `tagteam check [--base ref]` | For CI and pre-push: files changed on the branch vs the rules (exit 2 on a hit). Needs no saved handoff |
 | `tagteam doctor` | Check node, git, agents, keys and the repo (exit 1 on problems) |
 | `tagteam resume` | Print the context pack |
-| `tagteam log` / `tagteam show [id]` | Handoff history |
+| `tagteam log [--limit <n> \| --all]` | List the newest handoffs (20 by default, a positive whole number with `--limit`, or every handoff with `--all`) |
+| `tagteam show [id]` | Show a handoff (default: latest) |
 | `tagteam constraint` / `tagteam decision` | Add a rule (`--shared`: for the whole team, in the repo) or record a decision |
 | `tagteam install claude\|codex\|cursor` | Permanent per-repo wiring, if you run agents without `tagteam` |
 | `tagteam mcp` | MCP server: `get_context`, `save_handoff`, `add_decision`, `add_constraint`, `update_memory`, `list_handoffs` |

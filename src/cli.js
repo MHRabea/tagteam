@@ -25,7 +25,7 @@ Usage:
   tagteam resume                        Print the context pack (task, constraints, drift)
   tagteam status                        Drift, guardrail and completeness report (exit 2 on drift or guardrail hits)
   tagteam check [--base <ref>]          CI/pre-push: files changed since <ref> (default origin/HEAD) vs constraints (exit 2 on hits)
-  tagteam log                           List handoffs
+  tagteam log [--limit <n> | --all]      List newest handoffs (default: 20)
   tagteam show [id]                     Show a handoff (default: latest)
   tagteam constraint "<text>" [--paths "a/**,b"] [--shared] [--warn-only]
                                         --shared: save in .tagteam/constraints.json (commit it). --warn-only: never block edits
@@ -39,7 +39,16 @@ Hook mode (used by installed hooks; reads hook JSON on stdin, never fails the ag
   tagteam resume --hook
   tagteam capture --auto --reason precompact|session_end`;
 
+const cliArgs = process.argv.slice(2);
+// Use inline syntax for negative counts so they reach log's value validation.
+for (let i = 0; i < cliArgs.length && cliArgs[i] !== '--'; i++) {
+  if (cliArgs[i] === '--limit' && /^-(?:\d|\.\d)/.test(cliArgs[i + 1] ?? '')) {
+    cliArgs.splice(i, 2, `--limit=${cliArgs[i + 1]}`);
+  }
+}
+
 const { values: opt, positionals } = parseArgs({
+  args: cliArgs,
   allowPositionals: true,
   options: {
     auto: { type: 'boolean' },
@@ -64,6 +73,8 @@ const { values: opt, positionals } = parseArgs({
     yes: { type: 'boolean', short: 'y' },
     timeout: { type: 'string' },
     base: { type: 'string' },
+    limit: { type: 'string' },
+    all: { type: 'boolean' },
   },
 });
 const [cmd, ...args] = positionals;
@@ -94,6 +105,10 @@ const register = (root) => store.ensureProject(root, redact(remoteUrl(root)));
 
 async function main() {
   if (opt.help || cmd === 'help') return console.log(HELP);
+  if (cmd !== 'log') {
+    if (opt.limit !== undefined) throw new Error('--limit can only be used with tagteam log.');
+    if (opt.all) throw new Error('--all can only be used with tagteam log.');
+  }
   if (!cmd && !Object.keys(readConfig().profiles).length) {
     return console.log(`${HELP}\n\nFirst run? Add a profile: tagteam profile add claude`);
   }
@@ -274,8 +289,17 @@ async function main() {
     }
 
     case 'log': {
+      if (opt.all && opt.limit !== undefined) {
+        throw new Error('--limit and --all cannot be used together.');
+      }
+      const limit = Number(opt.limit ?? 20);
+      if (opt.limit !== undefined && (!opt.limit || /\D/.test(opt.limit) || limit === 0)) {
+        throw new Error('--limit must be a positive whole number.');
+      }
+
       const root = requireRoot();
-      const ids = store.listHandoffs(root).slice(0, 20);
+      const handoffs = store.listHandoffs(root);
+      const ids = opt.all ? handoffs : handoffs.slice(0, limit);
       if (!ids.length) return console.log('No handoffs yet.');
       for (const id of ids) {
         const h = store.readHandoff(root, id);

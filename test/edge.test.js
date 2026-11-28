@@ -15,6 +15,83 @@ const CLI = fileURLToPath(new URL('../src/cli.js', import.meta.url));
 const cli = (root, args, env = {}) =>
   spawnSync(process.execPath, [CLI, ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, GITHUB_ACTIONS: '', ...env } });
 
+test('log lists the newest 20 by default, a custom limit, or every handoff', () => {
+  const root = makeRepo();
+  const rows = Array.from({ length: 23 }, (_, index) => {
+    const number = index + 1;
+    const id = `2026-01-${String(number).padStart(2, '0')}T00-00-00`;
+    const title = `Handoff ${number}`;
+    store.saveHandoff(root, { id, source: 'agent', reason: 'manual', task: { title } });
+    return `${id}  agent  manual       ${title}\n`;
+  }).reverse();
+
+  for (const [args, expected] of [
+    [[], rows.slice(0, 20)],
+    [['--limit', '5'], rows.slice(0, 5)],
+    [['--limit=30'], rows],
+    [['--all'], rows],
+    [['--', '--limit', '-1', '--all'], rows.slice(0, 20)],
+  ]) {
+    const result = cli(root, ['log', ...args]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stderr, '');
+    assert.equal(result.stdout, expected.join(''));
+  }
+});
+
+test('log rejects limits that are not positive whole numbers', () => {
+  const root = makeRepo();
+  const inlineLimits = ['', '0', '-1', '2.5', '2x', '1e2', ' 5', '5\n'].map((value) => [`--limit=${value}`]);
+  for (const args of [...inlineLimits, ['--limit', '-1']]) {
+    const result = cli(root, ['log', ...args]);
+    assert.equal(result.status, 1, result.stderr);
+    assert.equal(result.stdout, '');
+    assert.equal(result.stderr, 'tagteam: --limit must be a positive whole number.\n');
+  }
+});
+
+test('log rejects combining --limit and --all', () => {
+  const result = cli(makeRepo(), ['log', '--limit', '5', '--all']);
+  assert.equal(result.status, 1);
+  assert.equal(result.stdout, '');
+  assert.match(result.stderr, /--limit and --all cannot be used together/);
+});
+
+test('log options are rejected before dispatch for other commands and bare invocations', () => {
+  const root = makeRepo();
+  const home = tmp('tagteam-log-options-');
+  // A configured summarizer-only profile exercises bare dispatch without an agent executable.
+  write(home, 'profiles.json', JSON.stringify({ profiles: { summary: { agent: 'none' } }, chain: ['summary'] }));
+
+  for (const [args, flag] of [
+    [['run', '--limit', '5'], '--limit'],
+    [['--all'], '--all'],
+    [['status', '--all'], '--all'],
+  ]) {
+    const result = cli(root, args, { TAGTEAM_HOME: home });
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.equal(result.stdout, '');
+    assert.equal(result.stderr, `tagteam: ${flag} can only be used with tagteam log.\n`);
+  }
+});
+
+test('log options preserve explicit help behavior', () => {
+  const root = makeRepo();
+  for (const args of [['run', '--limit', '5', '--help'], ['--all', '--help'], ['log', '--all', '-h']]) {
+    const result = cli(root, args);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stderr, '');
+    assert.match(result.stdout, /tagteam log \[--limit <n> \| --all\]/);
+  }
+});
+
+test('log --all reports an empty history', () => {
+  const result = cli(makeRepo(), ['log', '--all']);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+  assert.equal(result.stdout, 'No handoffs yet.\n');
+});
+
 const full = {
   task: { title: 'Fix prorate' },
   completed: ['swapped the division'],

@@ -85,7 +85,7 @@ export function installCodex(root) {
   writeFile(f, upsertBlock(readText(f).replace(legacy, '\n'), AGENT_BLOCK));
   return [
     `Updated ${f}`,
-    'Optional MCP: add to ~/.codex/config.toml →  [mcp_servers.tagteam]  command = "tagteam"  args = ["mcp"]',
+    'Optional MCP: add to ~/.codex/config.toml →  [mcp_servers.tagteam]  command = "tagteam"  args = ["mcp"]  default_tools_approval_mode = "approve"',
   ];
 }
 

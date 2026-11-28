@@ -18,7 +18,7 @@ export const handoffFields = {
   known_issues: strList.describe('Failing tests, errors, open questions'),
   tests: z
     .object({
-      command: z.string().optional(),
+      command: z.string().optional().describe('The exact test command, runnable from the repo root (e.g. "npm test"); avoid shell-specific setup such as $env: or export'),
       result: z.enum(['pass', 'fail', 'not_run']),
       notes: z.string().optional(),
     })
@@ -232,7 +232,7 @@ export function contextPack(root) {
     const v = readVerification(root);
     out.push(
       v?.handoff_id === h.id
-        ? `### Test check (re-run by tagteam verify, ${v.at.slice(0, 16).replace('T', ' ')} at ${short(v.head)})\n\`${v.command}\`: ${v.actual.toUpperCase()}. ${v.verdict}.`
+        ? `### Test check (re-run by tagteam verify, ${v.at.slice(0, 16).replace('T', ' ')} at ${short(v.head)})\n\`${v.command}\`: ${v.actual === 'unknown' ? 'COULD NOT RUN' : v.actual.toUpperCase()}. ${v.verdict}.`
         : `_The test result above is what the previous agent claimed; it has not been re-run. Run the tests before relying on it._`,
     );
   }

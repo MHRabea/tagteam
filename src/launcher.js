@@ -80,16 +80,18 @@ export function claudeRuntime(root) {
   // The /handoff command and the tagteam skill live at user level, so they work in every repo
   // and nothing is written into the user's repo.
   const config = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
-  installUserFile(path.join(config, 'commands', 'handoff.md'), TEMPLATE, 'tagteam capture --json');
+  installUserFile(path.join(config, 'commands', 'handoff.md'), TEMPLATE, /\b(tagteam|acm) capture --json/);
   installUserFile(path.join(config, 'skills', 'tagteam', 'SKILL.md'), SKILL, 'name: tagteam');
   return { settings, mcp };
 }
 
-// Write our template unless the user has their own file there: replace only a file that carries our marker.
+// Write our template unless the user has their own file there: replace only a file that carries our marker
+// (a string, or a RegExp so copies written under the pre-rename name "acm" are updated too).
 export function installUserFile(file, template, marker) {
   const ours = fs.readFileSync(template, 'utf8');
   const existing = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
-  if (existing === null || (existing !== ours && existing.includes(marker))) writeFile(file, ours);
+  const ourFile = existing !== null && (marker instanceof RegExp ? marker.test(existing) : existing.includes(marker));
+  if (existing === null || (existing !== ours && ourFile)) writeFile(file, ours);
 }
 
 // Drop variables inherited from a parent agent session (tagteam run inside a Claude Code terminal):
@@ -114,7 +116,9 @@ export function buildLaunch(p, root, key, name = p.agent) {
     const rt = claudeRuntime(root);
     const args = ['--settings', rt.settings, '--mcp-config', rt.mcp];
     if (p.model) args.push('--model', p.model);
-    if (hasTask) args.push(CLAUDE_START);
+    // The prompt goes first: --mcp-config takes several files, so a prompt after it is read as a config path
+    // and Claude Code refuses to start (seen live with Claude Code 2.1.330).
+    if (hasTask) args.unshift(CLAUDE_START);
     return { ...resolveCommand('claude'), args, env };
   }
 
@@ -134,6 +138,9 @@ export function buildLaunch(p, root, key, name = p.agent) {
       c(`mcp_servers.tagteam.command=${toml(process.execPath)}`);
       c(`mcp_servers.tagteam.args=[${toml(CLI)}, "mcp"]`);
       c(`mcp_servers.tagteam.env={${Object.entries(teamEnv(root)).map(([k, v]) => `${k}=${toml(v)}`).join(', ')}}`);
+      // tagteam's tools only write its own data (~/.tagteam). Without this, Codex asks before every save and
+      // `codex exec` (approval policy "never") rejects the save outright. Older Codex versions ignore the key.
+      c('mcp_servers.tagteam.default_tools_approval_mode="approve"');
     } else {
       args.push('--add-dir', home()); // let `tagteam capture` write its data from inside the sandbox
     }

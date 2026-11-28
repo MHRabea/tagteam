@@ -237,3 +237,46 @@ test('native-login codex preset needs no key and sets no provider', () => {
   assert.equal(p.provider, undefined);
   assert.equal(p.key, undefined);
 });
+
+// Found live with Claude Code 2.1.330: --mcp-config takes several files, so a prompt placed after it was read
+// as a config path and Claude refused to start whenever a handoff with a task existed.
+test('claude launch puts the start prompt before the flags, never right after --mcp-config', () => {
+  const dir = tmp('tagteam-bin-');
+  if (process.platform === 'win32') fs.writeFileSync(path.join(dir, 'claude.cmd'), '"%dp0%\node_modules\@anthropic-ai\claude-code\cli.js" %*');
+  else fs.writeFileSync(path.join(dir, 'claude'), '#!/bin/sh\n', { mode: 0o755 });
+  const old = process.env.PATH;
+  process.env.PATH = `${dir}${path.delimiter}${old}`;
+  try {
+    const root = makeRepo();
+    store.ensureProject(root);
+    const before = buildLaunch(buildProfile('claude'), root, null);
+    assert.ok(!before.args.some((a) => /Continue the task/.test(a)), 'no prompt without a task');
+    capture(root, { source: 'agent', fields: { task: { title: 'Billing' }, next_action: 'Add retry to renew()' } });
+    const { args } = buildLaunch(buildProfile('claude'), root, null);
+    assert.match(args[0], /^Continue the task from the tagteam session context/);
+    const i = args.indexOf('--mcp-config');
+    assert.ok(i > 0 && args[i + 1].endsWith('.json'));
+    assert.equal(args.length, i + 2, 'nothing after the --mcp-config file');
+  } finally {
+    process.env.PATH = old;
+  }
+});
+
+test('installUserFile: replaces our own copy (also the pre-rename acm one), never a file of the user', async () => {
+  const { installUserFile } = await import('../src/launcher.js');
+  const dir = tmp('tagteam-user-');
+  const template = path.join(dir, 'template.md');
+  fs.writeFileSync(template, 'call `tagteam capture --json` here\n');
+  const marker = /\b(tagteam|acm) capture --json/;
+  const old = path.join(dir, 'old.md');
+  fs.writeFileSync(old, 'pipe JSON to `acm capture --json --agent x`\n');
+  installUserFile(old, template, marker);
+  assert.equal(fs.readFileSync(old, 'utf8'), 'call `tagteam capture --json` here\n');
+  const mine = path.join(dir, 'mine.md');
+  fs.writeFileSync(mine, 'my own handoff command\n');
+  installUserFile(mine, template, marker);
+  assert.equal(fs.readFileSync(mine, 'utf8'), 'my own handoff command\n');
+  const fresh = path.join(dir, 'new', 'x.md');
+  installUserFile(fresh, template, 'tagteam capture --json');
+  assert.ok(fs.existsSync(fresh));
+});

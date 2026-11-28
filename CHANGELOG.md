@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.3.1 (unreleased)
+
+Fixes found by a live end-to-end run: real Claude Code → real Codex 0.172 → real Claude Code on one task.
+
+- **Claude Code did not start when a handoff with a task existed.** The start prompt came right after
+  `--mcp-config <file>`, which takes several files in Claude Code 2.1.330, so the prompt was read as a config
+  path. The prompt now comes first.
+- **Codex could not save handoffs non-interactively.** tagteam now passes
+  `mcp_servers.tagteam.default_tools_approval_mode="approve"` for its own MCP server (its tools only write
+  tagteam's data), so `codex exec` no longer rejects `save_handoff`, and interactive Codex does not ask each time.
+- **`tagteam verify` no longer reports a false FAIL** for a command that could not run. A PowerShell-style
+  command (`$env:X = ...; npm test`, as Codex writes on Windows) runs in PowerShell; a command the shell cannot
+  find is reported as "could not run, nothing proven" (exit 1), not as a failing test (exit 2).
+- The handoff's `tests.command` asks agents for a command runnable from the repo root.
+- `/handoff` copies installed under the pre-rename name (`acm`) are updated.
+
 ## 0.3.0 (2026-11-28)
 
 - **Edit guard (prevention).** A Claude Code `PreToolUse` hook (`tagteam guard --hook`, wired by `tagteam run`

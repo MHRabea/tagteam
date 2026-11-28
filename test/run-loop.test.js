@@ -182,6 +182,8 @@ test('codex: provider and MCP flags work; the context and save instructions are 
   assert.equal(r.error, undefined, r.error);
   assert.equal(r.env.TAGTEAM_PROVIDER_KEY, 'cx-test-key');
   assert.ok(r.args.includes(`model_providers.tagteam.base_url=${JSON.stringify(`${ctx.mock.url}/cx-agent`)}`));
+  // Found live with Codex 0.172: without it, codex exec rejects every tagteam tool call.
+  assert.ok(r.args.includes('mcp_servers.tagteam.default_tools_approval_mode="approve"'));
   assert.match(r.context, /wire the gateway/);
   assert.match(r.context, /save_handoff/);
   const h = store.latestHandoff(ctx.root);

@@ -265,8 +265,11 @@ async function main() {
       const secs = Number(opt.timeout ?? 600);
       if (!(secs > 0)) throw new Error('--timeout must be a number of seconds');
       const v = recordVerification(root, h, command, runTests(root, command, { timeoutMs: secs * 1000 }));
-      console.log(`\n${v.ok ? '✓' : '✗'} tagteam verify: ${v.verdict}${v.note ? ` (${v.note})` : ''}. The next agent will see this result.`);
-      if (!v.ok) process.exitCode = 2;
+      const mark = v.ok === null ? '?' : v.ok ? '✓' : '✗';
+      console.log(`\n${mark} tagteam verify: ${v.verdict}${v.note ? ` (${v.note})` : ''}. The next agent will see this result.`);
+      // 2: the claim is false. 1: nothing could be checked (not a test failure).
+      if (v.ok === false) process.exitCode = 2;
+      else if (v.ok === null) process.exitCode = 1;
       return;
     }
 

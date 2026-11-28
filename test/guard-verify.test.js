@@ -9,7 +9,7 @@ import { makeRepo } from './helpers.js';
 import * as store from '../src/store.js';
 import { capture, contextPack } from '../src/handoff.js';
 import { targetPath, blockingRule, setGuard, guardEnabled } from '../src/guard.js';
-import { compare, runTests, recordVerification, readVerification } from '../src/verify.js';
+import { compare, runTests, recordVerification, readVerification, shellFor } from '../src/verify.js';
 import { installClaude, HOOKS } from '../src/install.js';
 
 const CLI = fileURLToPath(new URL('../src/cli.js', import.meta.url));
@@ -131,4 +131,36 @@ test('verify CLI: needs --yes without a terminal, exit 2 on a false pass, 0 when
   const good = cli(root, ['verify', '--yes', '--timeout', '30']);
   assert.equal(good.status, 0, good.stderr);
   assert.match(good.stdout, /as claimed: pass/);
+});
+
+// Found live: Codex on Windows wrote "$env:NODE_OPTIONS = '...'; npm.cmd test", which cmd.exe cannot run,
+// and verify reported a false "FAIL". A command that cannot run proves nothing; PowerShell syntax runs in PowerShell.
+test('verify: a command that cannot run is "unknown", never a test failure', () => {
+  const root = makeRepo();
+  const r = runTests(root, 'tagteam-no-such-command-xyz', { stdio: 'ignore' });
+  assert.equal(r.couldNotRun, true);
+  assert.deepEqual(compare('pass', 'unknown').ok, null);
+  store.ensureProject(root);
+  const h = capture(root, { source: 'agent', fields: { task: { title: 't' }, next_action: 'x', tests: { command: 'tagteam-no-such-command-xyz', result: 'pass' } } });
+  const v = recordVerification(root, h, h.tests.command, r);
+  assert.equal(v.actual, 'unknown');
+  assert.match(contextPack(root), /COULD NOT RUN\. the command could not be run here/);
+  const out = cli(root, ['verify', '--yes']);
+  assert.equal(out.status, 1, 'exit 1 (nothing checked), not 2 (false claim)');
+  assert.match(out.stdout, /\? tagteam verify: the command could not be run/);
+});
+
+test('verify: PowerShell-style commands are detected and, on Windows, run in PowerShell', () => {
+  const ps = "$env:NODE_OPTIONS = '--preserve-symlinks'; npm.cmd test";
+  assert.equal(shellFor(ps, 'win32'), 'powershell');
+  assert.equal(shellFor(ps, 'linux'), 'default');
+  assert.equal(shellFor('npm test', 'win32'), 'default');
+  if (process.platform !== 'win32') return;
+  const root = makeRepo();
+  const ok = runTests(root, `$env:TT_X = '1'; & "${process.execPath}" -e "process.exit(process.env.TT_X === '1' ? 0 : 1)"`, { stdio: 'ignore' });
+  assert.equal(ok.shell, 'powershell');
+  assert.equal(ok.code, 0);
+  const bad = runTests(root, `$env:TT_X = '1'; & "${process.execPath}" -e "process.exit(4)"`, { stdio: 'ignore' });
+  assert.equal(bad.code, 4);
+  assert.equal(bad.couldNotRun, false);
 });

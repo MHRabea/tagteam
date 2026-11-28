@@ -77,6 +77,10 @@ tagteam constraint "Do not change the payment gateway interface" --paths "src/pa
 
 One rule, three layers:
 
+![A real Claude Code session: asked to add a retry to src/payments/gateway.js, its Write is blocked by tagteam's hook, and the agent stops and asks instead of working around it](https://raw.githubusercontent.com/MHRabea/tagteam/main/docs/guard.gif)
+
+<sub>Recorded from a real headless Claude Code session (2.1.330) with tagteam's hook; the agent's reply is quoted as written, with the proposed code cut.</sub>
+
 1. **During the session (prevention).** In Claude Code, tagteam's `PreToolUse` hook refuses the edit before it happens and tells the agent why. Tested with real Claude Code: the file stays untouched, and the agent stops and asks you instead of working around it:
    > I didn't change the file, because a tagteam guard hook blocked the edit: `src/payments/**` is protected by the rule "Do not change the payment gateway"…
 2. **At handover (detection).** Every agent sees the rule at session start, and `tagteam status` flags any diff that touches those paths (exit code 2). This also catches writes the hook can't see, such as shell commands, and agents without hooks (Codex).

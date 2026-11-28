@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.1 (unreleased)
+## 0.3.1 (2026-11-28)
 
 Fixes found by a live end-to-end run: real Claude Code → real Codex 0.172 → real Claude Code on one task.
 

@@ -1,6 +1,6 @@
 # tagteam
 
-[![npm](https://img.shields.io/npm/v/tagteam-ai)](https://www.npmjs.com/package/tagteam-ai) [![CI](https://github.com/MHRabea/tagteam/actions/workflows/ci.yml/badge.svg)](https://github.com/MHRabea/tagteam/actions/workflows/ci.yml) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE) [![GitHub stars](https://img.shields.io/github/stars/MHRabea/tagteam?style=social)](https://github.com/MHRabea/tagteam)
+[![npm](https://img.shields.io/npm/v/tagteam-ai)](https://www.npmjs.com/package/tagteam-ai) [![CI](https://github.com/MHRabea/tagteam/actions/workflows/ci.yml/badge.svg)](https://github.com/MHRabea/tagteam/actions/workflows/ci.yml) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE) [![GitHub stars](https://img.shields.io/github/stars/MHRabea/tagteam?style=social)](https://github.com/MHRabea/tagteam) [![tagteam MCP server](https://glama.ai/mcp/servers/MHRabea/tagteam/badges/score.svg)](https://glama.ai/mcp/servers/MHRabea/tagteam)
 
 **When your AI coding agent stops mid-task, the next one picks up from the exact next step, and is told what changed since. Rules you set are enforced: in the session, at handover, and in CI.**
 

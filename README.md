@@ -104,7 +104,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: MHRabea/tagteam@v0.2.0
+      - uses: MHRabea/tagteam@v0.3.0
 ```
 
 The same rule your AI agent was told about at session start is the one your CI checks, so an agent (or a person) can't quietly change a file you protected.

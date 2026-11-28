@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.0 (2026-11-28)
+
+- **Edit guard (prevention).** A Claude Code `PreToolUse` hook (`tagteam guard --hook`, wired by `tagteam run`
+  and `tagteam install claude`) refuses Edit/Write/MultiEdit/NotebookEdit calls on paths a constraint protects
+  and tells the agent why. Tested with real Claude Code: the file is untouched and the agent asks the user.
+  Shell writes and agents without hooks are still caught by `status`, `check` and the GitHub Action.
+  **Behaviour change:** existing path constraints now block edits in Claude Code. Use `--warn-only` for a rule
+  that should only warn, or `tagteam guard off` to pause the guard in a repo.
+- **`tagteam verify`.** Re-runs the handoff's test command (after showing it and asking, or with `--yes`),
+  compares with the claimed result, and exits 2 on a false "pass". The next agent's context shows the re-run
+  result, and labels an unverified result as a claim.
+- `tagteam guard [on|off]` lists blocking and warn-only rules; `tagteam constraint --warn-only`.
+- 109 tests.
+
 ## 0.2.0 (2026-11-28)
 
 - **Auto-switch on a usage limit.** `tagteam --auto-switch` (or `"autoSwitch": true` in `profiles.json`)

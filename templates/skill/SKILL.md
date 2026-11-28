@@ -11,7 +11,8 @@ tagteam saves a structured, git-verified handoff per repo so the next session (t
 
 - The SessionStart hook usually injects a "Session context (tagteam)" block. If it is missing, call the `get_context` tool (or run `tagteam resume`).
 - **Drift first.** If the context lists drift ("new commits since the handoff", "uncommitted changes differ"), read the changed files before trusting the handoff. Tell the user what changed.
-- **Constraints are binding.** Never break a listed constraint. If a constraint names paths, do not edit those files without the user's explicit go-ahead.
+- **Constraints are binding.** Never break a listed constraint. If a constraint names paths, do not edit those files without the user's explicit go-ahead. If tagteam blocks an edit, do not work around it (shell commands, copies, renames): tell the user which rule blocked it and ask.
+- If the context says the test result "has not been re-run", run the tests before relying on it.
 - Start from the handoff's **Next action** unless the user asks for something else.
 
 ## While working

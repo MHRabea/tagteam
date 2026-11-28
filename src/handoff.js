@@ -3,6 +3,7 @@ import { z } from 'zod';
 import * as store from './store.js';
 import { gitState, isAncestor, commitsSince, filesChangedSince, filesChangedInRange } from './git.js';
 import { redactDeep } from './redact.js';
+import { readVerification } from './verify.js';
 
 const strList = z.array(z.string()).default([]);
 
@@ -227,6 +228,14 @@ export function contextPack(root) {
     out.push(`## Constraints (do not violate)\n${bullets(constraints.map((c) => c.text + (c.paths?.length ? ` [${c.paths.join(', ')}]` : '')))}`);
   }
   if (h) out.push(renderHandoff(h));
+  if (h?.tests) {
+    const v = readVerification(root);
+    out.push(
+      v?.handoff_id === h.id
+        ? `### Test check (re-run by tagteam verify, ${v.at.slice(0, 16).replace('T', ' ')} at ${short(v.head)})\n\`${v.command}\`: ${v.actual.toUpperCase()}. ${v.verdict}.`
+        : `_The test result above is what the previous agent claimed; it has not been re-run. Run the tests before relying on it._`,
+    );
+  }
   if (gaps.length) out.push(`### Handoff gaps — confirm these with the code or the user before relying on the handoff\n${bullets(gaps)}`);
   if (decisions.length) {
     out.push(`## Recent decisions\n${bullets(decisions.slice(-10).map((d) => `${d.date}: ${d.decision}${d.why ? ` — ${d.why}` : ''}`))}`);

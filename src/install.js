@@ -24,6 +24,8 @@ export const HOOKS = [
   ['SessionStart', 'startup|resume|compact', 'tagteam resume --hook'],
   ['PreCompact', null, 'tagteam capture --auto --reason precompact'],
   ['SessionEnd', null, 'tagteam capture --auto --reason session_end'],
+  // Blocks edits to paths a constraint protects, before they happen.
+  ['PreToolUse', 'Edit|Write|MultiEdit|NotebookEdit', 'tagteam guard --hook'],
 ];
 
 export function installClaude(root) {

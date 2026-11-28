@@ -27,8 +27,11 @@ Usage:
   tagteam check [--base <ref>]          CI/pre-push: files changed since <ref> (default origin/HEAD) vs constraints (exit 2 on hits)
   tagteam log                           List handoffs
   tagteam show [id]                     Show a handoff (default: latest)
-  tagteam constraint "<text>" [--paths "a/**,b"] [--shared]   --shared: save in .tagteam/constraints.json (commit it)
+  tagteam constraint "<text>" [--paths "a/**,b"] [--shared] [--warn-only]
+                                        --shared: save in .tagteam/constraints.json (commit it). --warn-only: never block edits
   tagteam decision "<text>" [--why "..."]
+  tagteam guard [on|off]                Block agent edits to protected paths (Claude Code hook; default on)
+  tagteam verify [--yes] [--timeout s]  Re-run the handoff's test command and compare with what it claims (exit 2 on a false pass)
   tagteam mcp                           Start the MCP server (stdio)
   tagteam doctor                        Check node, git, agents, keys and the repo (exit 1 on problems)
 
@@ -57,6 +60,9 @@ const { values: opt, positionals } = parseArgs({
     'no-summary': { type: 'boolean' },
     'auto-switch': { type: 'boolean' },
     shared: { type: 'boolean' },
+    'warn-only': { type: 'boolean' },
+    yes: { type: 'boolean', short: 'y' },
+    timeout: { type: 'string' },
     base: { type: 'string' },
   },
 });
@@ -216,6 +222,54 @@ async function main() {
       return;
     }
 
+    case 'guard': {
+      const g = await import('./guard.js');
+      if (opt.hook) {
+        // PreToolUse hook: exit 2 with the reason on stderr blocks the tool call and tells the agent why.
+        const hook = parseJson((await readStdin()) || '{}', 'hook');
+        const root = gitRoot(hook.cwd || process.cwd());
+        if (!root) return;
+        const file = g.targetPath(root, { cwd: hook.cwd, ...hook.tool_input });
+        const rule = g.blockingRule(root, file);
+        if (!rule) return;
+        console.error(g.denyMessage(file, rule));
+        process.exitCode = 2;
+        return;
+      }
+      const root = requireRoot();
+      if (args[0] === 'on' || args[0] === 'off') {
+        register(root);
+        g.setGuard(root, args[0] === 'on');
+      } else if (args[0]) throw new Error('Usage: tagteam guard [on|off]');
+      const rules = store.allConstraints(root).filter((c) => c.paths?.length);
+      const blocking = rules.filter((c) => c.enforce !== 'warn');
+      console.log(`Guard: ${g.guardEnabled(root) ? 'on' : 'off'}${process.env.TAGTEAM_GUARD === 'off' ? ' (TAGTEAM_GUARD=off)' : ''}. ${blocking.length} blocking path rule(s), ${rules.length - blocking.length} warn-only.`);
+      for (const c of rules) console.log(`  ${c.enforce === 'warn' ? 'warn ' : 'block'}  ${c.paths.join(', ')}  — ${c.text}${c.shared ? ' (shared)' : ''}`);
+      return;
+    }
+
+    case 'verify': {
+      const root = requireRoot();
+      const { runTests, recordVerification } = await import('./verify.js');
+      const h = store.latestHandoff(root);
+      const command = h?.tests?.command;
+      if (!command) throw new Error('The latest handoff names no test command to re-run.');
+      console.log(`Handoff ${h.id} claims tests: ${h.tests.result}\nCommand from the handoff: ${command}`);
+      if (!opt.yes) {
+        if (!process.stdin.isTTY) throw new Error('Pass --yes to run it without a prompt (only for a command you trust).');
+        const rl = (await import('node:readline/promises')).createInterface({ input: process.stdin, output: process.stdout });
+        const a = (await rl.question('Run this command in the repo? [y/N] ')).trim();
+        rl.close();
+        if (!/^y(es)?$/i.test(a)) return console.log('Not run.');
+      }
+      const secs = Number(opt.timeout ?? 600);
+      if (!(secs > 0)) throw new Error('--timeout must be a number of seconds');
+      const v = recordVerification(root, h, command, runTests(root, command, { timeoutMs: secs * 1000 }));
+      console.log(`\n${v.ok ? '✓' : '✗'} tagteam verify: ${v.verdict}${v.note ? ` (${v.note})` : ''}. The next agent will see this result.`);
+      if (!v.ok) process.exitCode = 2;
+      return;
+    }
+
     case 'log': {
       const root = requireRoot();
       const ids = store.listHandoffs(root).slice(0, 20);
@@ -239,7 +293,7 @@ async function main() {
       if (!args[0]) throw new Error('Usage: tagteam constraint "<text>" [--paths "a/**,b"]');
       register(root);
       const paths = opt.paths?.split(',').map((p) => p.trim()).filter(Boolean);
-      const c = { text: redact(args[0]), ...(paths?.length ? { paths } : {}) };
+      const c = { text: redact(args[0]), ...(paths?.length ? { paths } : {}), ...(opt['warn-only'] ? { enforce: 'warn' } : {}) };
       if (opt.shared) {
         store.addSharedConstraint(root, c);
         return console.log(`Shared constraint saved to ${store.sharedConstraintsFile(root)}. Commit it so teammates and CI (tagteam check) get it.`);

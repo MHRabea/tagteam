@@ -13,6 +13,16 @@ tagteam profile add deepseek --key      # or any provider you already pay for
 tagteam --auto-switch                   # on a usage limit, continue on the next profile by itself
 ```
 
+**Just want Claude Code to stop editing files you care about?** Three commands, no profiles needed:
+
+```powershell
+npm i -g tagteam-ai                     # global install: the hook calls `tagteam`
+tagteam install claude                  # in your repo: adds the hooks (.claude/settings.local.json) and the MCP server (.mcp.json)
+tagteam constraint "Don't change the payment gateway" --paths "src/payments/**"
+```
+
+Restart Claude Code in the repo. From then on an Edit or Write to `src/payments/**` is refused before it happens, and the agent is told which rule blocked it ([see it in a real session](#guardrails-blocked-in-the-session-flagged-at-handover-failed-in-ci)). Add `--shared` to commit the rule for your team and enforce it on pull requests too.
+
 ![tagteam live run: real Claude Code fixes step 1 and saves a handoff, real Codex continues with step 2, real Claude Code picks it back up from Codex's handoff and writes the tests; 5/5 pass and the protected gateway file is untouched](https://raw.githubusercontent.com/MHRabea/tagteam/main/docs/switch.gif)
 
 <sub>A live run on one task: real Claude Code (2.1.330) → real Codex (0.172) → real Claude Code, through tagteam. The handoff, the agents' replies (excerpts, cut where marked …) and the command output are as they happened. An earlier demo with the summarizer writing the handoff after a usage limit: [docs/demo.gif](docs/demo.gif).</sub>

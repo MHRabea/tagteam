@@ -13,9 +13,9 @@ tagteam profile add deepseek --key      # or any provider you already pay for
 tagteam --auto-switch                   # on a usage limit, continue on the next profile by itself
 ```
 
-![tagteam demo: Claude Code hits its limit, Grok writes the handoff, DeepSeek continues from the next step, and status flags an edit to a protected file](https://raw.githubusercontent.com/MHRabea/tagteam/main/docs/demo.gif)
+![tagteam live run: real Claude Code fixes step 1 and saves a handoff, real Codex continues with step 2, real Claude Code picks it back up from Codex's handoff and writes the tests; 5/5 pass and the protected gateway file is untouched](https://raw.githubusercontent.com/MHRabea/tagteam/main/docs/switch.gif)
 
-<sub>The agent sessions are shown as one-line captions. Everything else is real tagteam output, including the handoff written by Grok.</sub>
+<sub>A live run on one task: real Claude Code (2.1.330) → real Codex (0.172) → real Claude Code, through tagteam. The handoff, the agents' replies (excerpts, cut where marked …) and the command output are as they happened. An earlier demo with the summarizer writing the handoff after a usage limit: [docs/demo.gif](docs/demo.gif).</sub>
 
 If tagteam saves you from re-explaining a project, a ⭐ on GitHub helps other developers find it.
 
